@@ -6,7 +6,7 @@ RUN apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-key C1CF6
 
 RUN apt-get -yq update && \
     DEBIAN_FRONTEND=noninteractive apt-get -yqq install \
-    ros-kinetic-ros-base \
+    ros-melodic-desktop \
     gcovr \
     ccache && \
     rm -rf /var/lib/apt/lists/*
