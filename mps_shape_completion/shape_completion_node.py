@@ -21,8 +21,8 @@ def service_callback(req, args):
     non = arr < 0.5
 
     time_stamp = datetime.utcnow().strftime("%Y-%m-%d-%H-%M-%S-%f")[:-3]
-    sc.save_input(occ, non, '.', time_stamp)
-    out = sc.complete(occ=occ, non=non, verbose=False, save=True, id=time_stamp, out_path='.')
+    #sc.save_input(occ, non, '.', time_stamp)
+    out = sc.complete(occ=occ, non=non, verbose=False, save=False, id=time_stamp, out_path='.')
 
     resp = CompleteShapeResponse()
     resp.hypothesis = vox_to_msg(out)
