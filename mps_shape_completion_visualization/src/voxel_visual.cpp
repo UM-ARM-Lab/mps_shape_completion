@@ -9,8 +9,6 @@
 
 namespace mps_shape_completion_visualization
 {
-
-// BEGIN_TUTORIAL
     VoxelGridVisual::VoxelGridVisual( Ogre::SceneManager* scene_manager, Ogre::SceneNode* parent_node )
     {
         scene_manager_ = scene_manager;
@@ -33,24 +31,24 @@ namespace mps_shape_completion_visualization
 
     void VoxelGridVisual::setMessage( const mps_shape_completion_msgs::OccupancyStamped::ConstPtr& msg)
     {
-        latest_msg = *msg;
+        latest_msg = msg;
         updatePointCloud();
     }
 
     void VoxelGridVisual::updatePointCloud()
     {
-        if(latest_msg.occupancy.layout.dim.size() == 0)
+        if(!latest_msg)
         {
             return;
         }
         
-        double scale = latest_msg.scale;
+        double scale = latest_msg->scale;
         voxel_grid_->setDimensions(scale, scale, scale);
 
 
-        const std::vector<float> data = latest_msg.occupancy.data;
-        const std::vector<std_msgs::MultiArrayDimension> dims = latest_msg.occupancy.layout.dim;
-        int data_offset = latest_msg.occupancy.layout.data_offset;
+        const std::vector<float> data = latest_msg->occupancy.data;
+        const std::vector<std_msgs::MultiArrayDimension> dims = latest_msg->occupancy.layout.dim;
+        int data_offset = latest_msg->occupancy.layout.data_offset;
 
         std::vector< rviz::PointCloud::Point> points;
         for(int i=0; i<dims[0].size; i++)
@@ -64,20 +62,17 @@ namespace mps_shape_completion_visualization
                     {
                         continue;
                     }
-                    
-                    rviz::PointCloud::Point p;
-                    p.position.x = scale/2 + i*scale;
-                    p.position.y = scale/2 + j*scale;
-                    p.position.z = scale/2 + k*scale;
-
-
                     if(binary_display_)
                     {
                         val = 1.0;
                     }
 
+                    rviz::PointCloud::Point p;
+                    p.position.x = scale/2 + i*scale;
+                    p.position.y = scale/2 + j*scale;
+                    p.position.z = scale/2 + k*scale;
+
                     p.setColor(r_, g_, b_, val*a_);
-                    
                     points.push_back(p);
                 }
             }

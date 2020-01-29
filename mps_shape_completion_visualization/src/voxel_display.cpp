@@ -20,24 +20,25 @@ namespace mps_shape_completion_visualization
 // constructor the parameters it needs to fully initialize.
     VoxelGridDisplay::VoxelGridDisplay()
     {
-        color_property_ = new rviz::ColorProperty( "Color", QColor( 204, 51, 204 ),
-                                                   "Color to draw the acceleration arrows.",
-                                                   this, SLOT( updateColorAndAlpha() ));
+        color_property_ = std::make_unique<rviz::ColorProperty>(
+            "Color", QColor( 204, 51, 204 ),
+            "Color to draw the acceleration arrows.",
+            this, SLOT( updateColorAndAlpha() ));
 
-        alpha_property_ = new rviz::FloatProperty( "Alpha Multiple", 1.0,
-                                                   "0 is fully transparent, 1.0 is fully opaque.",
-                                                   this, SLOT( updateColorAndAlpha() ));
+        alpha_property_ = std::make_unique<rviz::FloatProperty>(
+            "Alpha", 1.0,
+            "0 is fully transparent, 1.0 is fully opaque.",
+            this, SLOT( updateColorAndAlpha() ));
 
+        binary_display_property_ = std::make_unique<rviz::BoolProperty>(
+            "Binary Display", true,
+            "If checked, all voxels will have the same alpha",
+            this, SLOT(updateColorAndAlpha() ));
 
-        binary_display_property_ = new rviz::BoolProperty("Binary Display", true,
-                                                          "If checked, all voxels will have the same alpha",
-                                                          this, SLOT(updateColorAndAlpha() ));
-
-        cutoff_property_ = new rviz::FloatProperty("Threshold", 0.5,
-                                                   "Voxels with values less than this will not be displayed",
-                                                   this, SLOT(updateColorAndAlpha() ));
-
-
+        cutoff_property_ = std::make_unique<rviz::FloatProperty>(
+            "Threshold", 0.5,
+            "Voxels with values less than this will not be displayed",
+            this, SLOT(updateColorAndAlpha() ));
     }
 
 // After the top-level rviz::Display::initialize() does its own setup,
@@ -95,15 +96,11 @@ namespace mps_shape_completion_visualization
             return;
         }
 
-
         // Now set or update the contents of the chosen visual.
         visual_->setMessage( msg );
         visual_->setFramePosition( position );
         visual_->setFrameOrientation( orientation );
-
     }
-
-
     
 } // end namespace mps_shape_completion_visualization
 

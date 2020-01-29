@@ -48,10 +48,10 @@ private:
 
   // A local copy of the message is stored so that the voxelgrid can be
   // regenerated if the user changes the input
-  mps_shape_completion_msgs::OccupancyStamped latest_msg;
+  mps_shape_completion_msgs::OccupancyStamped::ConstPtr latest_msg;
   
   // The visible voxel grid ogre object
-  boost::shared_ptr<rviz::PointCloud> voxel_grid_;
+  std::shared_ptr<rviz::PointCloud> voxel_grid_;
 
   // A SceneNode whose pose is set to match the coordinate frame of
   Ogre::SceneNode* frame_node_;
@@ -66,7 +66,6 @@ private:
   float threshold_;
   
 };
-// END_TUTORIAL
 
 } // end namespace mps_shape_completion_visualization
 

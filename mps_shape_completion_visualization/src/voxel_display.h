@@ -1,8 +1,6 @@
 #ifndef VOXEL_DISPLAY_H
 #define VOXEL_DISPLAY_H
 
-#include <boost/circular_buffer.hpp>
-
 #include <mps_shape_completion_msgs/OccupancyStamped.h>
 #include <rviz/message_filter_display.h>
 
@@ -23,6 +21,7 @@ namespace mps_shape_completion_visualization
 
 class VoxelGridVisual;
 
+// TODO: inheriting from MessageFilterDisplay gives us topic handling (yay!), but also the undesirable "unreliabel" checkbox. 
 class VoxelGridDisplay: public rviz::MessageFilterDisplay<mps_shape_completion_msgs::OccupancyStamped>
 {
 Q_OBJECT
@@ -52,15 +51,13 @@ private:
   // Function to handle an incoming ROS message.
   void processMessage( const mps_shape_completion_msgs::OccupancyStamped::ConstPtr& msg);
 
-  // Storage for the list of visuals.  It is a circular buffer where
-  // data gets popped from the front (oldest) and pushed to the back (newest)
-  boost::shared_ptr<VoxelGridVisual > visual_;
+  std::unique_ptr<VoxelGridVisual > visual_;
 
   // User-editable property variables.
-  rviz::ColorProperty* color_property_;
-  rviz::FloatProperty* alpha_property_;
-  rviz::BoolProperty* binary_display_property_;
-  rviz::FloatProperty* cutoff_property_;
+  std::unique_ptr<rviz::ColorProperty> color_property_;
+  std::unique_ptr<rviz::FloatProperty> alpha_property_;
+  std::unique_ptr<rviz::BoolProperty> binary_display_property_;
+  std::unique_ptr<rviz::FloatProperty> cutoff_property_;
 };
 
 } // end namespace mps_shape_completion_visualization
