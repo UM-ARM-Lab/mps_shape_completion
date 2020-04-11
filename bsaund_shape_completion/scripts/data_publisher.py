@@ -18,16 +18,11 @@ import os
 
 sc_path = os.path.join(os.path.dirname(__file__), "../../")
 sys.path.append(sc_path)
-from shape_completion_training.model.network import Network
-from shape_completion_training.model import data_tools
-from shape_completion_training.model import obj_tools
-from shape_completion_training.model import nn_tools
-from shape_completion_training import binvox_rw
-
-
+from shape_completion_training import Network
+from shape_completion_training import data_tools
 
 # from bsaund_shape_completion import sampling_tools
-from shape_completion_training.model import sampling_tools
+from shape_completion_training import sampling_tools
 
 from rviz_text_selection_panel_msgs.msg import TextSelectionOptions
 from std_msgs.msg import String
@@ -35,9 +30,6 @@ from std_msgs.msg import String
 import threading
 
 import tensorflow as tf
-
-import IPython
-
 
 ARGS = None
 

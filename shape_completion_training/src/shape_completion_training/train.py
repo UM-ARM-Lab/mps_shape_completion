@@ -7,13 +7,8 @@ from os.path import dirname, abspath, join
 sc_path = join(dirname(abspath(__file__)), "..")
 sys.path.append(sc_path)
 
-from model import data_tools
-from model.network import Network
-import tensorflow as tf
-import numpy as np
-import IPython
-
-
+import data_tools
+from network import Network
 
 params = {
     'num_latent_layers': 200,
@@ -47,7 +42,7 @@ if __name__ == "__main__":
     # if params['network'] == 'VoxelCNN':
     #     sim_input_fn=data_tools.simulate_omniscient_input
     # elif params['network'] == 'AutoEncoder':
-    sim_input_fn=data_tools.simulate_2_5D_input
+    sim_input_fn= data_tools.simulate_2_5D_input
     
     data = data_tools.simulate_input(data,
                                      params['translation_pixel_range_x'],

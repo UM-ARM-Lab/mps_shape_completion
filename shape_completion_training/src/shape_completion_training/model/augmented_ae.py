@@ -2,7 +2,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import tensorflow as tf
 import tensorflow.keras.layers as tfl
-import nn_tools as nn
+import shape_completion_training.model.nn_tools as nn
 import numpy as np
 # from nn_tools import MaskedConv3D, p_x_given_y
 
@@ -29,13 +29,16 @@ def compute_vae_loss(z, mean, logvar, sample_logit, labels):
     logqz_x = log_normal_pdf(z, mean, logvar)
     return -tf.reduce_mean(logpx_z + logpz - logqz_x)
 
+def compute_angle_loss(true, mean, logvar):
+    return tf.reduce_mean(-log_normal_pdf(true, mean, logvar))
 
-class VAE(tf.keras.Model):
+
+class Augmented_VAE(tf.keras.Model):
     def __init__(self, params, batch_size):
-        super(VAE, self).__init__()
+        super(Augmented_VAE, self).__init__()
         self.params = params
         self.batch_size = batch_size
-        self.opt = tf.keras.optimizers.Adam(0.0001)
+        self.opt = tf.keras.optimizers.Adam(0.001)
 
         self.make_vae(inp_shape = [64,64,64,2])
 
@@ -64,12 +67,14 @@ class VAE(tf.keras.Model):
         return self.decode(eps, apply_sigmoid=True)
 
     def encode(self, x):
-        mean, logvar = tf.split(self.encoder(x), num_or_size_splits=2, axis=1)
+        nf = self.params['num_latent_layers']
+        mean, logvar = tf.split(self.encoder(x), num_or_size_splits=[nf, nf], axis=1)
         return mean, logvar
 
     def reparameterize(self, mean, logvar):
         eps = tf.random.normal(shape=mean.shape)
-        return eps * tf.exp(logvar * .5) + mean
+        features = eps * tf.exp(logvar * .5) + mean
+        return features
 
     def decode(self, z, apply_sigmoid=False):
         logits = self.generator(z)
@@ -77,6 +82,21 @@ class VAE(tf.keras.Model):
             probs = tf.sigmoid(logits)
             return probs
         return logits
+
+    def split_angle(self, inp):
+        features, angle = tf.split(inp, num_or_size_splits=[self.params['num_latent_layers']-1, 1], axis=1)
+        return features, angle
+
+    def replace_true_angle(self, z, true_angle, mean, logvar):
+        nf = self.params['num_latent_layers']
+        f, sampled_angle = tf.split(z, num_or_size_splits=[nf-1, 1], axis=1)
+        f_corrected = tf.concat([f, tf.expand_dims(true_angle, axis=1)], axis=1)
+
+        _, mean_angle = tf.split(mean, num_or_size_splits=[nf-1, 1], axis=1)
+        _, logvar_angle = tf.split(logvar, num_or_size_splits=[nf-1, 1], axis=1)
+        
+        return f_corrected, sampled_angle, mean_angle, logvar_angle
+
 
     @tf.function
     def train_step(self, batch):
@@ -88,106 +108,35 @@ class VAE(tf.keras.Model):
             with tf.GradientTape() as tape:
                 known = stack_known(batch)
                 mean, logvar = self.encode(known)
+                true_angle = batch['angle']
+                
                 z = self.reparameterize(mean, logvar)
-                sample_logit = self.decode(z)
-                vae_loss = compute_vae_loss(z, mean, logvar, sample_logit, labels=batch['gt_occ'])
+
+                z_corrected, sampled_angle, mean_angle, logvar_angle = self.replace_true_angle(z, true_angle, mean, logvar)
+                
+                sample_logit = self.decode(z_corrected)
+
+                z_f, sampled_angle = self.split_angle(z)
+                mean_f, mean_angle = self.split_angle(mean)
+                logvar_f, logvar_angle = self.split_angle(logvar)
+                
+                vae_loss = compute_vae_loss(z_f, mean_f, logvar_f, sample_logit, labels=batch['gt_occ'])
+                angle_loss = compute_angle_loss(true_angle, mean_angle, logvar_angle)
+                loss = vae_loss + angle_loss
+                
 
                 sample = tf.nn.sigmoid(sample_logit)
                 output = {'predicted_occ': sample, 'predicted_free': 1 - sample}
                 metrics = nn.calc_metrics(output, batch)
 
-                vae_variables = self.encoder.trainable_variables + self.generator.trainable_variables
-                gradients = tape.gradient(vae_loss, vae_variables)
-
-                self.opt.apply_gradients(list(zip(gradients, vae_variables)))
-                return vae_loss, metrics
-
-        loss, metrics = step_fn(batch)
-        m = {k: reduce(metrics[k]) for k in metrics}
-        m['loss'] = loss
-        return m
-
-
-
-
-class VAE_GAN(VAE):
-    def __init__(self, params, batch_size):
-        super(VAE_GAN, self).__init__(params, batch_size)
-        self.gan_opt = tf.keras.optimizers.Adam(0.00005)
-        self.discriminator = make_discriminator([64,64,64,3], self.params)
-        
-
-    def discriminate(self, known_input, output):
-        inp = tf.concat([known_input, output], axis=4)
-        return self.discriminator(inp)
-
-    def gradient_penalty(self, known, real, fake):
-        alpha = tf.random.uniform([self.batch_size, 1, 1, 1, 1], 0.0, 1.0)
-        diff = fake-real
-        interp = real + (alpha * diff)
-        with tf.GradientTape() as t:
-            t.watch(interp)
-            pred = self.discriminate(known, interp)
-            grad = t.gradient(pred, [interp])[0]
-        slopes = tf.sqrt(tf.reduce_sum(tf.square(grad), axis=[1,2,3,4]))
-        gp = tf.reduce_mean((slopes -1.)**2)
-        return gp
-
-
-    # @tf.function
-    def train_step(self, batch):
-        def reduce(val):
-            return tf.reduce_mean(val)
-            
-        
-        def step_fn(batch):
-            with tf.GradientTape(persistent=True) as tape:
-                ##### Forward pass
-                known = stack_known(batch)
-                mean, logvar = self.encode(known)
-                z = self.reparameterize(mean, logvar)
-                sample_logit = self.decode(z)
-                sample = tf.nn.sigmoid(sample_logit)
-                output = {'predicted_occ': sample, 'predicted_free': 1 - sample}
-                metrics = nn.calc_metrics(output, batch)
-
-                #### vae loss
-                vae_loss = compute_vae_loss(z, mean, logvar, sample_logit, labels=batch['gt_occ'])
+                metrics['loss/angle'] = angle_loss
                 metrics['loss/vae'] = vae_loss
 
-                ### gan loss
-                fake_occ = tf.cast(sample_logit > 0, tf.float32)
-                real_pair_est = self.discriminate(known, batch['gt_occ'])
-                fake_pair_est = self.discriminate(known, fake_occ)
-                gan_loss_g = 10000 * (1 + tf.reduce_mean(-fake_pair_est))
-                gan_loss_d_no_gp = 1 + tf.reduce_mean(fake_pair_est - real_pair_est)
-                
-                # gradient penalty
-                gp = self.gradient_penalty(known, batch['gt_occ'], fake_occ)
-                gan_loss_d = gan_loss_d_no_gp + gp
-                
-                metrics['loss/gan_g'] = gan_loss_g
-                metrics['loss/gan_d'] = gan_loss_d
-                metrics['loss/gan_gp'] = gp
-                metrics['loss/gan_d_no_gp'] = gan_loss_d_no_gp
-
-                
-
-                ### apply
-                generator_loss = vae_loss + gan_loss_g
-                dis_loss = gan_loss_d
-
                 vae_variables = self.encoder.trainable_variables + self.generator.trainable_variables
-                vae_gradients = tape.gradient(generator_loss, vae_variables)
-                clipped_vae_gradients = [tf.clip_by_value(g, -1e6, 1e6) for g in vae_gradients]
-                self.opt.apply_gradients(list(zip(clipped_vae_gradients, vae_variables)))
+                gradients = tape.gradient(loss, vae_variables)
 
-                dis_variables = self.discriminator.trainable_variables
-                dis_gradients = tape.gradient(dis_loss, dis_variables)
-                clipped_dis_gradients = [tf.clip_by_value(g, -1e6, 1e6) for g in dis_gradients]
-                self.gan_opt.apply_gradients(list(zip(clipped_dis_gradients, dis_variables)))
-
-                return generator_loss, metrics
+                self.opt.apply_gradients(list(zip(gradients, vae_variables)))
+                return loss, metrics
 
         loss, metrics = step_fn(batch)
         m = {k: reduce(metrics[k]) for k in metrics}

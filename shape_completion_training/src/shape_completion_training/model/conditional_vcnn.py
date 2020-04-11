@@ -2,8 +2,8 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import tensorflow as tf
 import tensorflow.keras.layers as tfl
-import nn_tools as nn
-from nn_tools import MaskedConv3D, p_x_given_y
+import shape_completion_training.model.nn_tools as nn
+from shape_completion_training.model.nn_tools import MaskedConv3D, p_x_given_y
 
 import IPython
 
@@ -52,12 +52,11 @@ class ConditionalVCNN(tf.keras.Model):
         p_occ = tf.nn.sigmoid(x['p_occ_logits'])
         return {'predicted_occ': p_occ, 'predicted_free': 1 - p_occ}
 
-    @tf.function
+    # @tf.function
     def train_step(self, batch):
         def reduce(val):
             return tf.reduce_mean(val)
-            
-        
+
         def step_fn(batch):
             with tf.GradientTape() as tape:
                 ae_features = self.encoder(self.prep_ae_input(batch))
@@ -67,7 +66,7 @@ class ConditionalVCNN(tf.keras.Model):
                 p_occ = tf.nn.sigmoid(cvcnn['p_occ_logits'])
                 output = {'predicted_occ': p_occ, 'predicted_free': 1 - p_occ}
                 metrics = nn.calc_metrics(output, batch)
-                
+
                 cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=cvcnn['p_occ_logits'],
                                                                     labels=batch['gt_occ'])
                 vcnn_loss = nn.reduce_sum_batch(cross_ent)
@@ -76,14 +75,14 @@ class ConditionalVCNN(tf.keras.Model):
                     tf.nn.sigmoid_cross_entropy_with_logits(logits=ae_output,
                                                             labels=batch['gt_occ']))
                 metrics['loss/aux_loss'] = ae_loss
-                
+
                 loss = vcnn_loss + 0.1 * ae_loss
-                
+
                 variables = self.trainable_variables
                 gradients = tape.gradient(loss, variables)
                 clipped_gradients = [tf.clip_by_value(g, -1e6, 1e6) for g in gradients]
                 self.opt.apply_gradients(list(zip(clipped_gradients, variables)))
-                return loss, metrics
+                return loss, metrics, output
 
         def step_fn_multiloss(batch):
             with tf.GradientTape() as tape:
@@ -111,29 +110,27 @@ class ConditionalVCNN(tf.keras.Model):
                     loss = loss + step_loss
                     metrics['loss/{}_step'.format(i)] = step_loss
 
-                    
+
                     cvcnn_inp = self.prep_cvcnn_inputs(tf.cast(cvcnn['p_occ_logits'] > 0, tf.float32),
                                                        ae_features)
 
-                    
+
                 metrics['loss/aux_loss'] = ae_loss
-                
+
                 variables = self.trainable_variables
                 gradients = tape.gradient(loss, variables)
                 clipped_gradients = [tf.clip_by_value(g, -1e6, 1e6) for g in gradients]
                 self.opt.apply_gradients(list(zip(clipped_gradients, variables)))
-                return loss, metrics
-            
+                return loss, metrics, output
+
         if self.params['multistep_loss']:
-            loss, metrics = step_fn_multiloss(batch)
+            loss, metrics, output = step_fn_multiloss(batch)
         else:
-            loss, metrics = step_fn(batch)
+            loss, metrics, output = step_fn(batch)
         m = {k: reduce(metrics[k]) for k in metrics}
         m['loss'] = loss
-        return m
+        return m, output
 
-    # def summary(self):
-    #     return self.summary()
 
 def make_encoder(inp_shape, batch_size, params):
     """Encoder of the autoencoder"""
@@ -162,7 +159,7 @@ def make_decoder(inp_shape, batch_size, params):
     inputs = tf.keras.Input(batch_size=batch_size, shape=(4,4,4,512))
 
     x = inputs
-    
+
     for n_filter in [256, 128, 64, 12]:
         x = tfl.Conv3DTranspose(n_filter, (2,2,2,), use_bias=True, strides=2)(x)
         x = tfl.Activation(tf.nn.relu)(x)
@@ -178,7 +175,7 @@ def make_cvcnn(inp_shape, batch_size, params):
               }
 
     auto_encoder_features = inputs['ae_features']
-              
+
     # VCNN
     filter_size = [2,2,2]
     # n_filters = [64, 128, 256, 512]
@@ -187,7 +184,7 @@ def make_cvcnn(inp_shape, batch_size, params):
     conv_args_strided = {'use_bias': True,
                          'nln': tf.nn.elu,
                          'strides':[1,2,2,2,1]}
-    
+
     def bs_strided(x, n_filters):
         return nn.BackShiftConv3D(n_filters, filter_size=filter_size, **conv_args_strided)(x)
     def bds_strided(x, n_filters):
@@ -198,7 +195,7 @@ def make_cvcnn(inp_shape, batch_size, params):
     conv_args = {'use_bias': True,
                  'nln': tf.nn.elu,
                  'strides':[1,1,1,1,1]}
-    
+
     def bs(x, n_filters):
         return nn.BackShiftConv3D(n_filters, filter_size=filter_size, **conv_args)(x)
     def bds(x, n_filters):
@@ -224,7 +221,7 @@ def make_cvcnn(inp_shape, batch_size, params):
     f_list = [f_1]
     uf_list = [uf_1]
     luf_list = [luf_1]
-    
+
     for fs in [64, 128, 256, 512]:
         f_list.append(bs_strided(f_list[-1], fs))
         uf_list.append(bds_strided(uf_list[-1], fs) + f_list[-1])
@@ -233,7 +230,7 @@ def make_cvcnn(inp_shape, batch_size, params):
     f = f_list.pop()
     uf = uf_list.pop()
     luf = tf.concat([luf_list.pop(), auto_encoder_features], axis=4)
-    
+
     for fs in [256, 128, 64, 4]:
         f = tf.concat([tfl.Conv3DTranspose(fs, [2,2,2], strides=[2,2,2])(f), f_list.pop()], axis=4)
         f = tfl.Activation(tf.nn.elu)(f)
@@ -243,18 +240,18 @@ def make_cvcnn(inp_shape, batch_size, params):
         luf = tfl.Activation(tf.nn.elu)(luf)
 
     x = luf
-    
+
     x = nn.Conv3D(n_filters=1, filter_size=[1,1,1], use_bias=True)(x)
 
-    
+
     output = {"p_occ_logits":x}
     return tf.keras.Model(inputs=inputs, outputs=output)
 
-    
 
 
 
-    
+
+
 def make_stack_net_v4(inp_shape, batch_size, params):
     """
     Autoencoder combined with VCNN
@@ -298,7 +295,7 @@ def make_stack_net_v4(inp_shape, batch_size, params):
     conv_args_strided = {'use_bias': True,
                          'nln': tf.nn.elu,
                          'strides':[1,2,2,2,1]}
-    
+
     def bs_strided(x, n_filters):
         return nn.BackShiftConv3D(n_filters, filter_size=filter_size, **conv_args_strided)(x)
     def bds_strided(x, n_filters):
@@ -309,7 +306,7 @@ def make_stack_net_v4(inp_shape, batch_size, params):
     conv_args = {'use_bias': True,
                  'nln': tf.nn.elu,
                  'strides':[1,1,1,1,1]}
-    
+
     def bs(x, n_filters):
         return nn.BackShiftConv3D(n_filters, filter_size=filter_size, **conv_args)(x)
     def bds(x, n_filters):
@@ -335,7 +332,7 @@ def make_stack_net_v4(inp_shape, batch_size, params):
     f_list = [f_1]
     uf_list = [uf_1]
     luf_list = [luf_1]
-    
+
     for fs in [64, 128, 256, 512]:
         f_list.append(bs_strided(f_list[-1], fs))
         uf_list.append(bds_strided(uf_list[-1], fs) + f_list[-1])
@@ -344,7 +341,7 @@ def make_stack_net_v4(inp_shape, batch_size, params):
     f = f_list.pop()
     uf = uf_list.pop()
     luf = tf.concat([luf_list.pop(), auto_encoder_features], axis=4)
-    
+
     for fs in [256, 128, 64, 4]:
         f = tf.concat([tfl.Conv3DTranspose(fs, [2,2,2], strides=[2,2,2])(f), f_list.pop()], axis=4)
         f = tfl.Activation(tf.nn.elu)(f)
@@ -354,10 +351,10 @@ def make_stack_net_v4(inp_shape, batch_size, params):
         luf = tfl.Activation(tf.nn.elu)(luf)
 
     x = luf
-    
+
     x = nn.Conv3D(n_filters=1, filter_size=[1,1,1], use_bias=True)(x)
 
-    
+
     output = {"p_occ_logits":x, "aux_logits": ae_output_before_activation}
     return tf.keras.Model(inputs=inputs, outputs=output)
 

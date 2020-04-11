@@ -1,10 +1,6 @@
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import tensorflow as tf
 import tensorflow.keras.layers as tfl
-import nn_tools as nn
-
-import IPython
+import shape_completion_training.model.nn_tools as nn
 
 
 
@@ -192,12 +188,12 @@ class AutoEncoder(tf.keras.Model):
 
                 self.opt.apply_gradients(list(zip(gradients, variables)))
                 metrics.update(self.get_insights(variables, gradients))
-                return loss, metrics
+                return loss, metrics, output
             
-        loss, metrics = step_fn(batch)
+        loss, metrics, output = step_fn(batch)
         m = {k: reduce(metrics[k]) for k in metrics}
         m['loss'] = loss
-        return m
+        return m, output
 
     @tf.function
     def get_insights(self, variables, gradients):

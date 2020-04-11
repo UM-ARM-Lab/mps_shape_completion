@@ -7,11 +7,9 @@ sys.path.append(sc_path)
 sc_path = join(dirname(abspath(__file__)), "../..")
 sys.path.append(sc_path)
 
-from model import data_tools
-from model.network import Network
-from model.voxelcnn import VoxelCNN, StackedVoxelCNN
-import model.nn_tools as nn
-import tensorflow.keras.layers as tfl
+import data_tools
+from voxelcnn import StackedVoxelCNN
+import nn_tools as nn
 import tensorflow as tf
 
 import numpy as np
@@ -158,7 +156,7 @@ if __name__ == "__main__":
     # data = data_ycb
     data = data_shapenet
 
-    sim_input_fn=data_tools.simulate_omniscient_input
+    sim_input_fn= data_tools.simulate_omniscient_input
     
     data = data_tools.simulate_input(data,
                                      params['translation_pixel_range_x'],

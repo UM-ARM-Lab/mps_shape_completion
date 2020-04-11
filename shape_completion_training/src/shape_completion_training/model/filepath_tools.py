@@ -21,7 +21,7 @@ def get_trial_directory(base_directory, nick=None, expect_reuse=False):
 
     if nick is None:
         print("Type a nickname for this trial")
-        nick = raw_input()
+        nick = input()
 
     if nick == "":
         nick = _make_tmp_nick(base_directory)
@@ -29,8 +29,8 @@ def get_trial_directory(base_directory, nick=None, expect_reuse=False):
     fp = join(base_directory, nick)
     reusing = _check_reuse_existing_directory(fp, nick, expect_reuse)
 
-    if not reusing:
-        _write_summary(fp, nick)
+    # if not reusing:
+    #     _write_summary(fp, nick)
 
     print("Running trial {} at {}".format(nick, fp))
     return fp
@@ -65,7 +65,7 @@ def handle_params(default_params_fp, model_params_fp, given_params):
         for missing_given_key in default_keys - given_keys:
             print("{} missing from specified keys".format(missing_given_key))
         print("Press any key to continue")
-        raw_input()
+        input()
     
     _write_params(model_params_fp, given_params)
     return given_params
@@ -90,7 +90,7 @@ def _make_new_trials_directory(trials_directory):
     print("WARNING: Trials directory does not exist")
     print("You have set the trials directory to {}, yet this directory does not exist".format(trials_directory))
     print("Create this new directory? y/N")
-    fb = raw_input()
+    fb = input()
 
     if fb.lower() == 'y':
         os.mkdir(trials_directory)
@@ -105,7 +105,7 @@ def _make_tmp_nick(trials_directory):
     fp = join(trials_directory, nick)
     if os.path.isdir(fp):
         print("Trial {} already exists. Delete and start fresh? y/N".format(nick))
-        fb = raw_input()
+        fb = input()
         if fb.lower() == 'y':
             shutil.rmtree(fp)
     return nick
@@ -115,7 +115,7 @@ def _check_reuse_existing_directory(fp, nick, expect_reuse):
     if not os.path.isdir(fp):
         if expect_reuse:
             print("Expected but not finding {}. Create? Y/n".format(nick))
-            if raw_input().lower() == 'n':
+            if input().lower() == 'n':
                 raise RuntimeError("Trial {} expected but not found".format(nick))
             
         os.mkdir(fp)
@@ -123,7 +123,7 @@ def _check_reuse_existing_directory(fp, nick, expect_reuse):
 
     if not expect_reuse:
         print("Trial {} already exists. Load from existing? Y/n".format(nick))
-        if raw_input().lower() == 'n':
+        if input().lower() == 'n':
             print("If you want to use this nick you must manually move (or delete) the existing trial")
             print()
             raise RuntimeError("No load directory specified. Trial {} exists and not reusing".format(nick))
@@ -136,7 +136,7 @@ def _write_summary(fp, nick, summary=None):
 
         if summary is None:
             print("Type a short summary for this trial")
-            summary = raw_input()
+            summary = input()
         f.write("Summary: \n{}\n\n".format(summary))
         f.write("git show --summary:\n")
         f.write(subprocess.check_output(['git', 'show', '--summary']))

@@ -8,14 +8,12 @@ from os.path import dirname, abspath, join
 sc_path = join(dirname(abspath(__file__)), "..")
 sys.path.append(sc_path)
 
-from model import obj_tools
-from model import data_tools
-import IPython
+from src.shape_completion_training.model import obj_tools
+import data_tools
 import subprocess
 from itertools import izip_longest
 import multiprocessing as mp
 import Queue
-import time
 import datetime
 
 

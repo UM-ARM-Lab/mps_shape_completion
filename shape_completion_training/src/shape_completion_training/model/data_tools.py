@@ -7,12 +7,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 from shape_completion_training import binvox_rw
 import numpy as np
-import sys
-import progressbar
-
-import IPython
-
-
 
 shape_map = {"airplane":"02691156",
              "mug":"03797390"}
