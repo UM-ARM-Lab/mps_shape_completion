@@ -2,8 +2,7 @@ import datetime
 import os
 import time
 
-from tensorboard.plugins.mesh import summary as mesh_summary
-# from tensorboard.plugins.mesh import summary_v2 as mesh_summary
+from tensorboard.plugins.mesh import summary_v2 as mesh_summary
 
 import progressbar
 import tensorflow as tf
@@ -14,6 +13,7 @@ from shape_completion_training.model.augmented_ae import Augmented_VAE
 from shape_completion_training.model.voxelcnn import VoxelCNN
 from shape_completion_training.model.vae import VAE, VAE_GAN
 from shape_completion_training.model.conditional_vcnn import ConditionalVCNN
+from ycb_video_pytools.ycb_video_dataset import indices_to_points
 
 
 class Network:
@@ -90,15 +90,35 @@ class Network:
             for k in summary_dict:
                 tf.summary.scalar(k, summary_dict[k].numpy(), step=self.ckpt.step.numpy())
 
-                gt_occ_point_cloud = tf.where(tf.squeeze(batch['gt_occ'][0]))
-                predicted_occ_point_cloud = tf.where(tf.squeeze(output['predicted_occ'][0]))
-                red = [1.0, 0.0, 0.0]
-                mesh_summary.op('predicted_occ',
-                                vertices=predicted_occ_point_cloud,
-                                colors=tf.ones_like(predicted_occ_point_cloud) * red)
-                mesh_summary.op('gt_occ',
-                                vertices=gt_occ_point_cloud,
-                                colors=tf.ones_like(gt_occ_point_cloud) * red)
+                # gt_occ = tf.squeeze(batch['gt_occ'][0])
+                # gt_occ_indices = tf.cast(tf.where(gt_occ), tf.float32)
+                # gt_occ_point_cloud = indices_to_points(gt_occ_indices, size_m=0.25, count=64)
+                # gt_occ_point_cloud = tf.expand_dims(gt_occ_point_cloud, axis=0)
+                #
+                # predicted_occ = tf.squeeze(output['predicted_occ'][0])
+                # predicted_occ_indices = tf.cast(tf.where(predicted_occ), tf.float32)
+                # predicted_occ_point_cloud = indices_to_points(predicted_occ_indices, size_m=0.25, count=64)
+                # predicted_occ_point_cloud = tf.expand_dims(predicted_occ_point_cloud, axis=0)
+                #
+                # red = [1.0, 0.0, 0.0]
+                # camera_config = {
+                #     'cls': 'PerspectiveCamera',
+                #     'fov': 75,
+                #     'aspect': 0.9,
+                #     'near': 0.01,
+                # }
+                # mesh_summary.mesh('predicted_occ',
+                #                   vertices=predicted_occ_point_cloud,
+                #                   colors=tf.ones_like(predicted_occ_point_cloud) * red,
+                #                   step=self.ckpt.step.numpy(),
+                #                   config_dict={"camera": camera_config},
+                #                   )
+                # mesh_summary.mesh('gt_occ',
+                #                   vertices=gt_occ_point_cloud,
+                #                   colors=tf.ones_like(gt_occ_point_cloud) * red,
+                #                   step=self.ckpt.step.numpy(),
+                #                   config_dict={"camera": camera_config},
+                #                   )
 
     def train_batch(self, dataset):
         if self.num_batches is not None:
