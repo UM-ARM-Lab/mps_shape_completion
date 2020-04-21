@@ -1,19 +1,16 @@
-import datetime
 import os
 import time
 
-from tensorboard.plugins.mesh import summary_v2 as mesh_summary
-
+import numpy as np
 import progressbar
 import tensorflow as tf
 
 from shape_completion_training.model import filepath_tools
-from shape_completion_training.model.auto_encoder import AutoEncoder
 from shape_completion_training.model.augmented_ae import Augmented_VAE
-from shape_completion_training.model.voxelcnn import VoxelCNN
-from shape_completion_training.model.vae import VAE, VAE_GAN
+from shape_completion_training.model.auto_encoder import AutoEncoder
 from shape_completion_training.model.conditional_vcnn import ConditionalVCNN
-from ycb_video_pytools.ycb_video_dataset import indices_to_points
+from shape_completion_training.model.vae import VAE, VAE_GAN
+from shape_completion_training.model.voxelcnn import VoxelCNN
 
 
 class Network:
@@ -85,7 +82,7 @@ class Network:
         # tf.keras.utils.plot_model(self.model.get_model(), os.path.join(self.trial_fp, 'network.png'),
         #                           show_shapes=True)
 
-    def write_summary(self, writer, summary_dict, batch, output):
+    def write_summary(self, writer, summary_dict):
         with writer.as_default():
             for k in summary_dict:
                 tf.summary.scalar(k, summary_dict[k].numpy(), step=self.ckpt.step.numpy())
@@ -133,14 +130,20 @@ class Network:
             self.ckpt.step.assign_add(1)
 
             summary_dict, output = self.model.train_step(batch)
-            self.write_summary(self.train_summary_writer, summary_dict, batch, output)
+            self.write_summary(self.train_summary_writer, summary_dict)
             self.ckpt.train_time.assign_add(time.time() - t0)
             t0 = time.time()
 
         if val_dataset is not None:
+            summaries = {}
             for batch in progressbar.progressbar(val_dataset):
                 summary_dict, output = self.model.val_step(batch)
-                self.write_summary(self.test_summary_writer, summary_dict, batch, output)
+                for k, v in summary_dict.items():
+                    if k not in summaries:
+                        summaries[k] = []
+                    summaries[k].append(v)
+            mean_summary_dict = dict([(k, tf.math.reduce_mean(v)) for (k, v) in summaries.items()])
+            self.write_summary(self.test_summary_writer, mean_summary_dict)
 
         save_path = self.manager.save()
         print("Saved checkpoint for step {}: {}".format(int(self.ckpt.step), save_path))
