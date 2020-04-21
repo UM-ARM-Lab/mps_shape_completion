@@ -13,5 +13,6 @@
  "turn_on_prob":0.0,
  "turn_off_prob":0.0,
  "loss":"mse",
- "multistep_loss": false
+ "multistep_loss": false,
+ "flooding_level": null 
 }

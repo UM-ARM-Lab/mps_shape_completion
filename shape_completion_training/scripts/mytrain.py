@@ -28,15 +28,17 @@ params = {
     'turn_off_prob': 0.0,
     'loss': 'cross_entropy',
     'multistep_loss': True,
+    'flooding_level': None,
 }
 
 
 def train_main(args, seed):
     dataset = ycb_video_dataset.YCBReconstructionDataset(args.dataset_dir)
-    tf_train_dataset = dataset.load(mode='train')
+    tf_train_dataset = dataset.load(mode='train').take(128)
+    tf_validation_dataset = dataset.load(mode='val').take(128)
 
     net = Network(params, training=True, rootdir='trials')
-    net.train_and_test(tf_train_dataset)
+    net.train(tf_train_dataset, tf_validation_dataset)
 
 
 def eval_main(args, seed):

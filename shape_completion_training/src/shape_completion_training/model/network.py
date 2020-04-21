@@ -85,8 +85,8 @@ class Network:
         # tf.keras.utils.plot_model(self.model.get_model(), os.path.join(self.trial_fp, 'network.png'),
         #                           show_shapes=True)
 
-    def write_summary(self, summary_dict, batch, output):
-        with self.train_summary_writer.as_default():
+    def write_summary(self, writer, summary_dict, batch, output):
+        with writer.as_default():
             for k in summary_dict:
                 tf.summary.scalar(k, summary_dict[k].numpy(), step=self.ckpt.step.numpy())
 
@@ -120,7 +120,7 @@ class Network:
                 #                   config_dict={"camera": camera_config},
                 #                   )
 
-    def train_batch(self, dataset):
+    def train_batch(self, train_dataset, val_dataset):
         if self.num_batches is not None:
             max_size = str(self.num_batches)
         else:
@@ -128,27 +128,35 @@ class Network:
 
         self.num_batches = 0
         t0 = time.time()
-        for batch in progressbar.progressbar(dataset):
+        for batch in progressbar.progressbar(train_dataset):
             self.num_batches += 1
             self.ckpt.step.assign_add(1)
 
             summary_dict, output = self.model.train_step(batch)
-            time_str = str(datetime.timedelta(seconds=int(self.ckpt.train_time.numpy())))
-            self.write_summary(summary_dict, batch, output)
+            self.write_summary(self.train_summary_writer, summary_dict, batch, output)
             self.ckpt.train_time.assign_add(time.time() - t0)
             t0 = time.time()
+
+        if val_dataset is not None:
+            for batch in progressbar.progressbar(val_dataset):
+                summary_dict, output = self.model.val_step(batch)
+                self.write_summary(self.test_summary_writer, summary_dict, batch, output)
 
         save_path = self.manager.save()
         print("Saved checkpoint for step {}: {}".format(int(self.ckpt.step), save_path))
         print("loss {:1.3f}".format(summary_dict['loss'].numpy()))
 
-    def train(self, dataset):
-        self.build_model(dataset)
+    def train(self, train_dataset, validation_dataset):
+        self.build_model(train_dataset)
         self.count_params()
         # dataset = dataset.shuffle(10000)
 
         # batched_ds = dataset.batch(self.batch_size, drop_remainder=True).prefetch(64)
-        batched_ds = dataset.batch(self.batch_size).prefetch(64)
+        batched_train_dataset = train_dataset.batch(self.batch_size).prefetch(64)
+        if validation_dataset is not None:
+            batched_validation_dataset = validation_dataset.batch(self.batch_size).prefetch(64)
+        else:
+            batched_validation_dataset = None
 
         num_epochs = 1000
         while self.ckpt.epoch < num_epochs:
@@ -156,13 +164,13 @@ class Network:
             print('')
             print('==  Epoch {}/{}  '.format(self.ckpt.epoch.numpy(), num_epochs) + '=' * 25 \
                   + ' ' + self.trial_name + ' ' + '=' * 20)
-            self.train_batch(batched_ds)
+            self.train_batch(batched_train_dataset, batched_validation_dataset)
             print('=' * 48)
 
     def train_and_test(self, dataset):
         train_ds = dataset
 
-        self.train(train_ds)
+        self.train(train_ds, None)
         self.count_params()
 
     def evaluate(self, dataset):
