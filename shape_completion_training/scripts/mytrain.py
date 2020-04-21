@@ -34,8 +34,8 @@ params = {
 
 def train_main(args, seed):
     dataset = ycb_video_dataset.YCBReconstructionDataset(args.dataset_dir)
-    tf_train_dataset = dataset.load(mode='train').take(128)
-    tf_validation_dataset = dataset.load(mode='val').take(128)
+    tf_train_dataset = dataset.load(mode='train')
+    tf_validation_dataset = dataset.load(mode='val')
 
     net = Network(params, training=True, rootdir='trials')
     net.train(tf_train_dataset, tf_validation_dataset)
