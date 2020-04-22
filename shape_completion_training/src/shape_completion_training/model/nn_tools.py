@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow_addons as tfa
 
 
 @tf.function
@@ -183,6 +184,15 @@ def calc_metrics(output, batch):
     unknown_occ = batch['gt_occ'] - batch['known_occ']
     unknown_free = batch['gt_free'] - batch['known_free']
 
+    iou_metric = tf.keras.metrics.MeanIoU(num_classes=2)
+    binary_pred_occ = tf.cast(output['predicted_occ'] > 0.5, tf.float32)
+    iou_metric(y_true=batch['gt_occ'], y_pred=binary_pred_occ)
+    iou = iou_metric.result().numpy()
+
+    fscore_metric = tfa.metrics.F1Score(num_classes=1, threshold=0.5, average=None)
+    fscore_metric(y_true=tf.reshape(batch['gt_occ'], [-1, 1]), y_pred=tf.reshape(output['predicted_occ'], [-1, 1]))
+    fscore = fscore_metric.result().numpy()
+
     metrics = {"mse/occ": mse_occ, "acc/occ": acc_occ,
                "mse/free": mse_free, "acc/free": acc_free,
                "pred|gt/p(predicted_occ|gt_occ)": p_x_given_y(output['predicted_occ'],
@@ -213,12 +223,13 @@ def calc_metrics(output, batch):
                "sanity/p(gt_free|known_occ)": p_x_given_y(batch['gt_free'], batch['known_occ']),
                "sanity/p(gt_occ|known_free)": p_x_given_y(batch['gt_occ'], batch['known_free']),
                "sanity/p(gt_free|known_free)": p_x_given_y(batch['gt_free'], batch['known_free']),
+               "IOU": iou,
+               "F-Score": fscore,
                }
     return metrics
 
 
 def make_metrics_function(loss_function):
-    @tf.function
     def _metrics(_dataset_element, _model_outputs):
         metrics = calc_metrics(_model_outputs, _dataset_element)
         metrics = {k: tf.reduce_mean(metrics[k]) for k in metrics}

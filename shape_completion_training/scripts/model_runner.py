@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import argparse
 import json
+import logging
 import pathlib
 from copy import deepcopy
 
@@ -56,11 +57,13 @@ def train_func(args, seed: int):
 
 
 def eval_func(args, seed: int):
+    tf.config.experimental_run_functions_eagerly(True)
+
     ###############
     # Dataset
     ###############
     test_dataset = YCBReconstructionDataset(args.dataset_dirs)
-    test_tf_dataset = test_dataset.load(mode=args.mode)
+    test_tf_dataset = test_dataset.load(mode=args.mode, take=args.take, shard=args.shard)
 
     test_tf_dataset = test_tf_dataset.batch(args.batch_size, drop_remainder=True)
 
@@ -96,6 +99,7 @@ def main():
     train_parser.add_argument('--batch-size', type=int, default=16)
     train_parser.add_argument('--log', '-l')
     train_parser.add_argument('--take', type=int, help='take a subset of the dataset')
+    train_parser.add_argument('--shard', type=int, help='take every nth element of the dataset')
     train_parser.add_argument('--verbose', '-v', action='count', default=0)
     train_parser.add_argument('--log-scalars-every', type=int, help='loss/accuracy every this many steps/batches', default=500)
     train_parser.set_defaults(func=train_func)
@@ -103,12 +107,15 @@ def main():
     eval_parser = subparsers.add_parser('eval')
     eval_parser.add_argument('dataset_dirs', type=pathlib.Path, nargs='+')
     eval_parser.add_argument('checkpoint', type=pathlib.Path)
+    eval_parser.add_argument('--take', type=int, help='take a subset of the dataset')
     eval_parser.add_argument('--batch-size', type=int, default=16)
-    eval_parser.add_argument('--mode', type=str, choices=['test', 'val', 'train'], default='test')
+    eval_parser.add_argument('--mode', type=str, choices=['val', 'train'], default='val')
+    eval_parser.add_argument('--shard', type=int, help='take every nth element of the dataset')
     eval_parser.add_argument('--verbose', '-v', action='count', default=0)
     eval_parser.set_defaults(func=eval_func)
 
     args = parser.parse_args()
+    tf.get_logger().setLevel(logging.ERROR)
 
     if args.seed is None:
         seed = np.random.randint(0, 10000)
