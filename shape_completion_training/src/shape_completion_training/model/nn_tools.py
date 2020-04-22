@@ -193,12 +193,18 @@ def calc_metrics(output, batch):
     fscore_metric(y_true=tf.reshape(batch['gt_occ'], [-1, 1]), y_pred=tf.reshape(output['predicted_occ'], [-1, 1]))
     fscore = fscore_metric.result().numpy()
 
+    precision_metric = tf.keras.metrics.Precision(thresholds=0.5)
+    precision_metric(y_true=batch['gt_occ'], y_pred=output['predicted_occ'])
+    precision = precision_metric.result().numpy()
+
+    recall_metric = tf.keras.metrics.Precision(thresholds=0.5)
+    recall_metric(y_true=batch['gt_occ'], y_pred=output['predicted_occ'])
+    recall = recall_metric.result().numpy()
+
     metrics = {"mse/occ": mse_occ, "acc/occ": acc_occ,
                "mse/free": mse_free, "acc/free": acc_free,
-               "(precision) pred|gt/p(predicted_occ|gt_occ)": p_x_given_y(output['predicted_occ'],
-                                                                          batch['gt_occ']),
-               "(recall) pred|gt/p(predicted_occ|gt_occ)": p_x_given_y(batch['gt_occ'],
-                                                                       output['predicted_occ']),
+               "pred|gt/p(predicted_occ|gt_occ)": p_x_given_y(output['predicted_occ'],
+                                                              batch['gt_occ']),
                "pred|gt/p(predicted_free|gt_free)": p_x_given_y(output['predicted_free'],
                                                                 batch['gt_free']),
                "pred|known/p(predicted_occ|known_occ)": p_x_given_y(output['predicted_occ'],
@@ -227,6 +233,8 @@ def calc_metrics(output, batch):
                "sanity/p(gt_free|known_free)": p_x_given_y(batch['gt_free'], batch['known_free']),
                "IOU": iou,
                "F-Score": fscore,
+               "precision": precision,
+               "recall": recall,
                }
     return metrics
 
