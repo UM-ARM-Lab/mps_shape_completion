@@ -2,17 +2,6 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 
 
-@tf.function
-def p_x_given_y(x, y):
-    """
-    Returns the reduce p(x|y)
-    Clips x from 0 to one, then filters and normalizes by y
-    Assumes y is a tensor where every element is 0.0 or 1.0
-    """
-    clipped = tf.clip_by_value(x, 0.0, 1.0)
-    return tf.reduce_sum(clipped * y) / tf.reduce_sum(y)
-
-
 class MaskedConv3D(tf.keras.layers.Layer):
     def __init__(self, conv_size, in_channels, out_channels, name='masked_conv_3d', is_first_layer=False):
         super(MaskedConv3D, self).__init__(name=name)
@@ -175,6 +164,17 @@ def reduce_sum_batch(value):
     return tf.reduce_sum(v1)
 
 
+@tf.function
+def p_x_given_y(x, y):
+    """
+    Returns the reduce p(x|y)
+    Clips x from 0 to one, then filters and normalizes by y
+    Assumes y is a tensor where every element is 0.0 or 1.0
+    """
+    clipped = tf.clip_by_value(x, 0.0, 1.0)
+    return tf.reduce_sum(clipped * y) / tf.reduce_sum(y)
+
+
 def calc_metrics(output, batch):
     acc_occ = tf.math.abs(batch['gt_occ'] - output['predicted_occ'])
     mse_occ = tf.math.square(acc_occ)
@@ -195,8 +195,10 @@ def calc_metrics(output, batch):
 
     metrics = {"mse/occ": mse_occ, "acc/occ": acc_occ,
                "mse/free": mse_free, "acc/free": acc_free,
-               "pred|gt/p(predicted_occ|gt_occ)": p_x_given_y(output['predicted_occ'],
-                                                              batch['gt_occ']),
+               "(precision) pred|gt/p(predicted_occ|gt_occ)": p_x_given_y(output['predicted_occ'],
+                                                                          batch['gt_occ']),
+               "(recall) pred|gt/p(predicted_occ|gt_occ)": p_x_given_y(batch['gt_occ'],
+                                                                       output['predicted_occ']),
                "pred|gt/p(predicted_free|gt_free)": p_x_given_y(output['predicted_free'],
                                                                 batch['gt_free']),
                "pred|known/p(predicted_occ|known_occ)": p_x_given_y(output['predicted_occ'],
