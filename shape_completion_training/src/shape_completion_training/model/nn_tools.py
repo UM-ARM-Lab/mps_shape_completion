@@ -218,6 +218,7 @@ def calc_metrics(output, batch):
 
 
 def make_metrics_function(loss_function):
+    @tf.function
     def _metrics(_dataset_element, _model_outputs):
         metrics = calc_metrics(_model_outputs, _dataset_element)
         metrics = {k: tf.reduce_mean(metrics[k]) for k in metrics}
