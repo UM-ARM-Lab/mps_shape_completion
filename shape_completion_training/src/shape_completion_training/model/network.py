@@ -1,7 +1,6 @@
 import os
 import time
 
-import numpy as np
 import progressbar
 import tensorflow as tf
 
@@ -13,9 +12,27 @@ from shape_completion_training.model.vae import VAE, VAE_GAN
 from shape_completion_training.model.voxelcnn import VoxelCNN
 
 
+def get_model(params, batch_size):
+    if params['network'] == 'VoxelCNN':
+        model = VoxelCNN(params, batch_size=batch_size)
+    elif params['network'] == 'AutoEncoder':
+        model = AutoEncoder(params, batch_size=batch_size)
+    elif params['network'] == 'VAE':
+        model = VAE(params, batch_size=batch_size)
+    elif params['network'] == 'VAE_GAN':
+        model = VAE_GAN(params, batch_size=batch_size)
+    elif params['network'] == 'Augmented_VAE':
+        model = Augmented_VAE(params, batch_size=batch_size)
+    elif params['network'] == 'Conditional_VCNN':
+        model = ConditionalVCNN(params, batch_size=batch_size)
+    else:
+        raise Exception('Unknown Model Type')
+    return model
+
+
 class Network:
-    def __init__(self, params=None, trial_name=None, training=False, rootdir='trials'):
-        self.batch_size = 16
+    def __init__(self, params=None, trial_name=None, training=False, rootdir='trials', batch_size: int = 16):
+        self.batch_size = batch_size
         if not training:
             self.batch_size = 1
         self.side_length = 64
@@ -36,22 +53,7 @@ class Network:
         self.train_summary_writer = tf.summary.create_file_writer(train_log_dir)
         self.test_summary_writer = tf.summary.create_file_writer(test_log_dir)
 
-        if self.params['network'] == 'VoxelCNN':
-            self.model = VoxelCNN(self.params, batch_size=self.batch_size)
-        # if self.params['network'] == 'StackedVoxelCNN':
-        #     self.model = StackedVoxelCNN(self.params, batch_size=self.batch_size)
-        elif self.params['network'] == 'AutoEncoder':
-            self.model = AutoEncoder(self.params, batch_size=self.batch_size)
-        elif self.params['network'] == 'VAE':
-            self.model = VAE(self.params, batch_size=self.batch_size)
-        elif self.params['network'] == 'VAE_GAN':
-            self.model = VAE_GAN(self.params, batch_size=self.batch_size)
-        elif self.params['network'] == 'Augmented_VAE':
-            self.model = Augmented_VAE(self.params, batch_size=self.batch_size)
-        elif self.params['network'] == 'Conditional_VCNN':
-            self.model = ConditionalVCNN(self.params, batch_size=self.batch_size)
-        else:
-            raise Exception('Unknown Model Type')
+        self.model = get_model(params=params, batch_size=batch_size)
 
         self.num_batches = None
 

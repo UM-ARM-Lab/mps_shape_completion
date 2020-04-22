@@ -2,6 +2,7 @@
 Utilities used by networks
 '''
 import os
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import tensorflow as tf
 import tensorflow.keras.layers as tfl
@@ -20,7 +21,6 @@ def p_x_given_y(x, y):
     return tf.reduce_sum(clipped * y) / tf.reduce_sum(y)
 
 
-
 class MaskedConv3D(tf.keras.layers.Layer):
     def __init__(self, conv_size, in_channels, out_channels, name='masked_conv_3d', is_first_layer=False):
         super(MaskedConv3D, self).__init__(name=name)
@@ -30,16 +30,15 @@ class MaskedConv3D(tf.keras.layers.Layer):
         self.is_first_layer = is_first_layer
 
     def build(self, input_shape):
-        conv_vars = int(self.conv_size)**3
+        conv_vars = int(self.conv_size) ** 3
 
         if self.is_first_layer:
-            n_train = (conv_vars/2) * self.in_channels * self.out_channels
-            n_zeros = (conv_vars/2+1) * self.in_channels * self.out_channels
+            n_train = (conv_vars / 2) * self.in_channels * self.out_channels
+            n_zeros = (conv_vars / 2 + 1) * self.in_channels * self.out_channels
         else:
-            n_zeros = (conv_vars/2) * self.in_channels * self.out_channels
-            n_train = (conv_vars/2+1) * self.in_channels * self.out_channels
+            n_zeros = (conv_vars / 2) * self.in_channels * self.out_channels
+            n_train = (conv_vars / 2 + 1) * self.in_channels * self.out_channels
 
-        
         self.a = self.add_weight(name=self.name + 'trainable',
                                  shape=[n_train],
                                  initializer=tf.initializers.GlorotUniform(),
@@ -56,24 +55,24 @@ class MaskedConv3D(tf.keras.layers.Layer):
 
     def call(self, inputs):
         cs = self.conv_size
-        f = tf.reshape(tf.concat([self.a,self.b], axis=0),
+        f = tf.reshape(tf.concat([self.a, self.b], axis=0),
                        [cs, cs, cs, self.in_channels, self.out_channels])
 
-        x = tf.nn.conv3d(inputs, f, strides=[1,1,1,1,1], padding='SAME')
+        x = tf.nn.conv3d(inputs, f, strides=[1, 1, 1, 1, 1], padding='SAME')
         return tf.nn.bias_add(x, self.bias)
 
 
 class Conv3D(tf.keras.layers.Layer):
-    def __init__(self, n_filters, filter_size=[3,3,3], use_bias=True,
-                 nln=None, name=None, strides=[1,1,1,1,1]):
+    def __init__(self, n_filters, filter_size=[3, 3, 3], use_bias=True,
+                 nln=None, name=None, strides=[1, 1, 1, 1, 1]):
         super(Conv3D, self).__init__(name=name)
         self.filter_size = filter_size
         self.n_filters = n_filters
         self.b = None
-        self.padding='VALID'
+        self.padding = 'VALID'
         self.use_bias = use_bias
         self.nln = nln
-        self.strides=strides
+        self.strides = strides
 
     def build(self, input_shape):
         self.w = self.add_weight(name='weights',
@@ -95,46 +94,46 @@ class Conv3D(tf.keras.layers.Layer):
         if self.nln is not None:
             x = self.nln(x)
         return x
-        
+
 
 class BackShiftConv3D(Conv3D):
     def __init__(self, n_filters, **kwargs):
         super(BackShiftConv3D, self).__init__(n_filters, **kwargs)
 
     def call(self, x):
-        x = tf.pad(x, [[0,0], [self.filter_size[0]-1, 0],
-                       [int((self.filter_size[1]-1)/2), int((self.filter_size[1])/2)],
-                       [int((self.filter_size[2]-1)/2), int((self.filter_size[2])/2)],
-                       [0,0]])
+        x = tf.pad(x, [[0, 0], [self.filter_size[0] - 1, 0],
+                       [int((self.filter_size[1] - 1) / 2), int((self.filter_size[1]) / 2)],
+                       [int((self.filter_size[2] - 1) / 2), int((self.filter_size[2]) / 2)],
+                       [0, 0]])
 
         return super(BackShiftConv3D, self).call(x)
 
-    
+
 class BackDownShiftConv3D(Conv3D):
     def __init__(self, n_filters, **kwargs):
         super(BackDownShiftConv3D, self).__init__(n_filters, **kwargs)
 
     def call(self, x):
-        x = tf.pad(x, [[0,0], [self.filter_size[0]-1, 0],
-                       [self.filter_size[1]-1, 0],
-                       [int((self.filter_size[2]-1)/2), int((self.filter_size[2])/2)],
-                       [0,0]])
+        x = tf.pad(x, [[0, 0], [self.filter_size[0] - 1, 0],
+                       [self.filter_size[1] - 1, 0],
+                       [int((self.filter_size[2] - 1) / 2), int((self.filter_size[2]) / 2)],
+                       [0, 0]])
 
         return super(BackDownShiftConv3D, self).call(x)
+
 
 class BackDownRightShiftConv3D(Conv3D):
     def __init__(self, n_filters, **kwargs):
         super(BackDownRightShiftConv3D, self).__init__(n_filters, **kwargs)
 
     def call(self, x):
-        x = tf.pad(x, [[0,0], [self.filter_size[0]-1, 0],
-                       [self.filter_size[1]-1, 0],
-                       [self.filter_size[2]-1, 0],
-                       [0,0]])
+        x = tf.pad(x, [[0, 0], [self.filter_size[0] - 1, 0],
+                       [self.filter_size[1] - 1, 0],
+                       [self.filter_size[2] - 1, 0],
+                       [0, 0]])
 
         return super(BackDownRightShiftConv3D, self).call(x)
 
-    
 
 class BackShift(tf.keras.layers.Layer):
     def __init__(self):
@@ -142,21 +141,22 @@ class BackShift(tf.keras.layers.Layer):
 
     def call(self, x):
         return back_shift(x)
-    
+
+
 class DownShift(tf.keras.layers.Layer):
     def __init__(self):
         super(DownShift, self).__init__()
 
     def call(self, x):
         return up_shift(x)
-    
+
+
 class RightShift(tf.keras.layers.Layer):
     def __init__(self):
         super(RightShift, self).__init__()
 
     def call(self, x):
         return right_shift(x)
-        
 
 
 def int_shape(x):
@@ -165,22 +165,22 @@ def int_shape(x):
 
 def back_shift(x):
     xs = int_shape(x)
-    return tf.concat([tf.zeros([xs[0],1,xs[2],xs[3],xs[4]]), x[:,:xs[1]-1,:,:,:]],1)
+    return tf.concat([tf.zeros([xs[0], 1, xs[2], xs[3], xs[4]]), x[:, :xs[1] - 1, :, :, :]], 1)
+
 
 def up_shift(x):
     xs = int_shape(x)
-    return tf.concat([tf.zeros([xs[0],xs[1],1,xs[3],xs[4]]), x[:,:,:xs[2]-1,:,:]],2)
+    return tf.concat([tf.zeros([xs[0], xs[1], 1, xs[3], xs[4]]), x[:, :, :xs[2] - 1, :, :]], 2)
+
 
 def right_shift(x):
     xs = int_shape(x)
-    return tf.concat([tf.zeros([xs[0],xs[1],xs[2],1,xs[4]]), x[:,:,:,:xs[3]-1,:]],3)
+    return tf.concat([tf.zeros([xs[0], xs[1], xs[2], 1, xs[4]]), x[:, :, :, :xs[3] - 1, :]], 3)
 
-                    
 
 def reduce_sum_batch(value):
     v1 = tf.reduce_mean(value, axis=[0])
     return tf.reduce_sum(v1)
-
 
 
 def calc_metrics(output, batch):
@@ -188,7 +188,7 @@ def calc_metrics(output, batch):
     mse_occ = tf.math.square(acc_occ)
     acc_free = tf.math.abs(batch['gt_free'] - output['predicted_free'])
     mse_free = tf.math.square(acc_free)
-    
+
     unknown_occ = batch['gt_occ'] - batch['known_occ']
     unknown_free = batch['gt_free'] - batch['known_free']
 
@@ -222,5 +222,15 @@ def calc_metrics(output, batch):
                "sanity/p(gt_free|known_occ)": p_x_given_y(batch['gt_free'], batch['known_occ']),
                "sanity/p(gt_occ|known_free)": p_x_given_y(batch['gt_occ'], batch['known_free']),
                "sanity/p(gt_free|known_free)": p_x_given_y(batch['gt_free'], batch['known_free']),
-    }
+               }
     return metrics
+
+
+def make_metrics_function(loss_function, dataset_element, model_outputs):
+    def _metrics(_model_outputs, _dataset_element):
+        metrics = calc_metrics(_model_outputs, _dataset_element)
+        metrics['loss'] = loss_function(_dataset_element, _model_outputs)
+        return metrics
+
+    return _metrics
+

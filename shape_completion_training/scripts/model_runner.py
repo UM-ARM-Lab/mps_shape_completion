@@ -1,0 +1,129 @@
+#!/usr/bin/env python
+import argparse
+import json
+import pathlib
+
+import numpy as np
+import tensorflow as tf
+
+from moonshine import experiments_util
+from moonshine.loss_utils import sigmoid_cross_entropy_with_logits
+from moonshine.tensorflow_train_test_loop import evaluate, train
+from shape_completion_training.model.network import Network
+from shape_completion_training.model.nn_tools import make_metrics_function
+from ycb_video_pytools.ycb_video_dataset import YCBReconstructionDataset
+
+
+def train_func(args, seed: int):
+    if args.log:
+        log_path = experiments_util.experiment_name(args.log)
+    else:
+        log_path = None
+
+    # Model parameters
+    model_hparams = json.load(open(args.model_hparams, 'r'))
+
+    # Datasets
+    dataset = YCBReconstructionDataset(args.dataset_dirs)
+    train_tf_dataset = dataset.load(mode='train')
+    val_tf_dataset = dataset.load(mode='val')
+    train_tf_dataset = train_tf_dataset.shuffle(seed=args.seed, buffer_size=1024).batch(args.batch_size, drop_remainder=True)
+    val_tf_dataset = val_tf_dataset.batch(args.batch_size, drop_remainder=True)
+
+    # Copy parameters of the dataset into the model
+    model_hparams['dynamics_dataset_hparams'] = dataset.hparams
+    model_hparams['batch_size'] = args.batch_size
+    net = Network(params=model_hparams, batch_size=args.batch_size, training=True)
+
+    ###############
+    # Train
+    ###############
+    train(keras_model=net,
+          model_hparams=model_hparams,
+          train_tf_dataset=train_tf_dataset,
+          val_tf_dataset=val_tf_dataset,
+          dataset_dirs=args.dataset_dirs,
+          seed=seed,
+          batch_size=args.batch_size,
+          epochs=model_hparams['epochs'],
+          loss_function=sigmoid_cross_entropy_with_logits,
+          metrics_function=make_metrics_function(sigmoid_cross_entropy_with_logits),
+          checkpoint=args.checkpoint,
+          log_path=log_path,
+          log_scalars_every=args.log_scalars_every)
+
+
+def eval_func(args, seed: int):
+    ###############
+    # Dataset
+    ###############
+    test_dataset = DynamicsDataset(args.dataset_dirs)
+    test_tf_dataset = test_dataset.get_datasets(mode=args.mode,
+                                                sequence_length=args.sequence_length,
+                                                )
+
+    test_tf_dataset = test_tf_dataset.batch(args.batch_size, drop_remainder=True)
+
+    ###############
+    # Model
+    ###############
+    model_hparams_file = args.checkpoint / 'hparams.json'
+    model_hparams = json.load(open(model_hparams_file, 'r'))
+    model_hparams['dt'] = test_dataset.hparams['dt']
+
+    net = Network(params=model_hparams, training=False, batch_size=args.batch_size)
+
+    ###############
+    # Evaluate
+    ###############
+    evaluate(keras_model=net,
+             test_tf_dataset=test_tf_dataset,
+             loss_function=dynamics_loss_function,
+             metrics_function=dynamics_metrics_function,
+             checkpoint_path=args.checkpoint)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--seed', type=int, default=None)
+
+    subparsers = parser.add_subparsers()
+
+    train_parser = subparsers.add_parser('train')
+    train_parser.add_argument('dataset_dirs', type=pathlib.Path, nargs='+')
+    train_parser.add_argument('model_hparams', type=pathlib.Path)
+    train_parser.add_argument('--checkpoint', type=pathlib.Path)
+    train_parser.add_argument('--batch-size', type=int, default=32)
+    train_parser.add_argument('--log', '-l')
+    train_parser.add_argument('--ensemble-idx', type=int)
+    train_parser.add_argument('--verbose', '-v', action='count', default=0)
+    train_parser.add_argument('--log-scalars-every', type=int, help='loss/accuracy every this many steps/batches', default=119)
+    train_parser.set_defaults(func=train_func)
+
+    eval_parser = subparsers.add_parser('eval')
+    eval_parser.add_argument('dataset_dirs', type=pathlib.Path, nargs='+')
+    eval_parser.add_argument('checkpoint', type=pathlib.Path)
+    eval_parser.add_argument('--sequence-length', type=int, default=10)
+    eval_parser.add_argument('--batch-size', type=int, default=32)
+    eval_parser.add_argument('--mode', type=str, choices=['test', 'val', 'train'], default='test')
+    eval_parser.add_argument('--verbose', '-v', action='count', default=0)
+    eval_parser.set_defaults(func=eval_func)
+
+    args = parser.parse_args()
+
+    if args.seed is None:
+        seed = np.random.randint(0, 10000)
+    else:
+        seed = args.seed
+    print("Random seed: {}".format(seed))
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+
+    if args == argparse.Namespace():
+        parser.print_usage()
+    else:
+        args.func(args, seed)
+
+
+if __name__ == '__main__':
+    main()
