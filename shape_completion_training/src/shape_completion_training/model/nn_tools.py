@@ -1,13 +1,4 @@
-'''
-Utilities used by networks
-'''
-import os
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import tensorflow as tf
-import tensorflow.keras.layers as tfl
-
-import IPython
 
 
 @tf.function
@@ -179,7 +170,7 @@ def right_shift(x):
 
 
 def reduce_sum_batch(value):
-    v1 = tf.reduce_mean(value, axis=[0])
+    v1 = tf.reduce_mean(value, axis=0)
     return tf.reduce_sum(v1)
 
 
@@ -226,11 +217,11 @@ def calc_metrics(output, batch):
     return metrics
 
 
-def make_metrics_function(loss_function, dataset_element, model_outputs):
-    def _metrics(_model_outputs, _dataset_element):
+def make_metrics_function(loss_function):
+    def _metrics(_dataset_element, _model_outputs):
         metrics = calc_metrics(_model_outputs, _dataset_element)
+        metrics = {k: tf.reduce_mean(metrics[k]) for k in metrics}
         metrics['loss'] = loss_function(_dataset_element, _model_outputs)
         return metrics
 
     return _metrics
-

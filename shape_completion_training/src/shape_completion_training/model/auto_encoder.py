@@ -13,6 +13,7 @@ class AutoEncoder(tf.keras.Model):
         self.batch_size = batch_size
         self.opt = tf.keras.optimizers.Adam(0.001)
 
+    # what the heck is this for
     def get_model(self):
         return self
 
@@ -56,9 +57,6 @@ class AutoEncoder(tf.keras.Model):
             tfl.Activation(tf.nn.relu, name='deconv_3_activation'),
 
             tfl.Conv3DTranspose(1, (2, 2, 2,), strides=2, name='deconv_4_deconv'),
-            # tfl.Activation(tf.nn.relu,                    name='deconv_4_activation'),
-
-            # tfl.Conv3DTranspose(1, (2,2,2,), strides=1,   name='deconv_5_deconv', padding="same"),
         ]
         if self.params['is_u_connected'] and self.params['use_final_unet_layer']:
             extra_unet_layers = [
@@ -128,14 +126,11 @@ class AutoEncoder(tf.keras.Model):
             x = self.layers_dict['unet_combine'](x)
             x = self.layers_dict['unet_final_activation'](x)
 
-        # x = self.layers_dict['deconv_5_deconv'](x)
-
         # Get logits if training, probabilities if inference
         if not training:
             x = tf.nn.sigmoid(x)
         occ = x
         free = 1 - x
-        # occ, free = tf.split(x, 2, axis=4)
 
         return {'predicted_occ': occ, 'predicted_free': free}
 

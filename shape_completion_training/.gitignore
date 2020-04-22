@@ -6,3 +6,6 @@ tmp_data/*
 logs/*
 trials/*
 old_trials/*
+hparams
+log_data
+
