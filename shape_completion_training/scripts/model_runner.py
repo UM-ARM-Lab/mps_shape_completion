@@ -11,7 +11,7 @@ import tensorflow as tf
 from moonshine import experiments_util
 from moonshine.loss_utils import sigmoid_cross_entropy_with_logits
 from moonshine.tensorflow_train_test_loop import evaluate, train
-from shape_completion_training.model import network
+from shape_completion_training.model import model_runner
 from shape_completion_training.model.nn_tools import make_metrics_function
 from ycb_video_pytools.ycb_video_dataset import YCBReconstructionDataset
 
@@ -35,7 +35,7 @@ def train_func(args, seed: int):
     # Copy parameters of the dataset into the model
     model_hparams['dynamics_dataset_hparams'] = dataset.hparams
     model_hparams['batch_size'] = args.batch_size
-    model = network.get_model(model_hparams['network'])
+    model = model_runner.get_model(model_hparams['network'])
     net = model(params=deepcopy(model_hparams), batch_size=args.batch_size)
 
     ###############
@@ -55,7 +55,7 @@ def train_func(args, seed: int):
           log_path=log_path,
           log_scalars_every=args.log_scalars_every,
           validation_every=args.log_scalars_every,
-          validation_size=100,
+          validation_size=args.validation_size,
           validate_on_epoch_end=True,
           )
 
@@ -77,7 +77,7 @@ def eval_func(args, seed: int):
     model_hparams_file = args.checkpoint / 'hparams.json'
     model_hparams = json.load(open(model_hparams_file, 'r'))
 
-    model = network.get_model(model_hparams['network'])
+    model = model_runner.get_model(model_hparams['network'])
     net = model(params=model_hparams, batch_size=args.batch_size)
 
     ###############
@@ -106,6 +106,7 @@ def main():
     train_parser.add_argument('--shard', type=int, help='take every nth element of the dataset')
     train_parser.add_argument('--verbose', '-v', action='count', default=0)
     train_parser.add_argument('--log-scalars-every', type=int, help='loss/accuracy every this many steps/batches', default=100)
+    train_parser.add_argument('--validation-size', type=int, help='number of examples for validation during epoch', default=100)
     train_parser.set_defaults(func=train_func)
 
     eval_parser = subparsers.add_parser('eval')

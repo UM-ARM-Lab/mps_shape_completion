@@ -203,12 +203,12 @@ class AutoEncoder(tf.keras.Model):
 
                 self.opt.apply_gradients(list(zip(gradients, variables)))
                 metrics.update(self.get_insights(variables, gradients))
-                return loss, metrics, output
+                return loss, metrics
 
-        loss, metrics, output = step_fn(batch)
+        loss, metrics = step_fn(batch)
         m = {k: reduce(metrics[k]) for k in metrics}
         m['loss'] = loss
-        return m, output
+        return m
 
     @tf.function
     def get_insights(self, variables, gradients):

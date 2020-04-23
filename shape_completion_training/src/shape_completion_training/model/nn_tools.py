@@ -175,6 +175,7 @@ def p_x_given_y(x, y):
     return tf.reduce_sum(clipped * y) / tf.reduce_sum(y)
 
 
+@tf.function
 def calc_metrics(output, batch):
     acc_occ = tf.math.abs(batch['gt_occ'] - output['predicted_occ'])
     mse_occ = tf.math.square(acc_occ)
@@ -187,19 +188,19 @@ def calc_metrics(output, batch):
     iou_metric = tf.keras.metrics.MeanIoU(num_classes=2)
     binary_pred_occ = tf.cast(output['predicted_occ'] > 0.5, tf.float32)
     iou_metric(y_true=batch['gt_occ'], y_pred=binary_pred_occ)
-    iou = iou_metric.result().numpy()
+    iou = iou_metric.result()
 
     fscore_metric = tfa.metrics.F1Score(num_classes=1, threshold=0.5, average=None)
     fscore_metric(y_true=tf.reshape(batch['gt_occ'], [-1, 1]), y_pred=tf.reshape(output['predicted_occ'], [-1, 1]))
-    fscore = fscore_metric.result().numpy()
+    fscore = fscore_metric.result()
 
     precision_metric = tf.keras.metrics.Precision(thresholds=0.5)
     precision_metric(y_true=batch['gt_occ'], y_pred=output['predicted_occ'])
-    precision = precision_metric.result().numpy()
+    precision = precision_metric.result()
 
     recall_metric = tf.keras.metrics.Recall(thresholds=0.5)
     recall_metric(y_true=batch['gt_occ'], y_pred=output['predicted_occ'])
-    recall = recall_metric.result().numpy()
+    recall = recall_metric.result()
 
     metrics = {"mse/occ": mse_occ, "acc/occ": acc_occ,
                "mse/free": mse_free, "acc/free": acc_free,

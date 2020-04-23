@@ -47,18 +47,29 @@ def instantiate_model(params, batch_size):
     return model
 
 
-class Network:
-    def __init__(self, params=None, trial_name=None, training=False, rootdir='trials', batch_size: int = 16):
+class ModelRunner:
+    def __init__(self,
+                 params=None,
+                 trial_name=None,
+                 training=False,
+                 rootdir='trials',
+                 train_summary_every: int = 100,
+                 validation_summary_every: int = 100,
+                 validation_size: int = 100,
+                 validation_on_end_of_epoch: bool = True,
+                 batch_size: int = 16):
+        self.train_summary_every = train_summary_every
+        self.validation_on_end_of_epoch = validation_on_end_of_epoch
         self.batch_size = batch_size
+        self.validation_summary_every = validation_summary_every
+        self.validation_size = validation_size
         if not training:
             self.batch_size = 1
         self.side_length = 64
         self.num_voxels = self.side_length ** 3
 
         file_fp = os.path.dirname(__file__)
-        fp = filepath_tools.get_trial_directory(rootdir,
-                                                expect_reuse=(params is None),
-                                                nick=trial_name)
+        fp = filepath_tools.get_trial_directory(rootdir, expect_reuse=(params is None), nick=trial_name)
         self.trial_name = fp.split('/')[-1]
         self.params = filepath_tools.handle_params(file_fp, fp, params)
 
@@ -110,36 +121,51 @@ class Network:
     def train_batch(self, train_dataset, val_dataset):
         self.num_batches = 0
         t0 = time.time()
+        validation_iterator = iter(val_dataset.repeat())
         for batch in progressbar.progressbar(train_dataset):
             self.num_batches += 1
             self.ckpt.step.assign_add(1)
 
-            summary_dict, output = self.model.train_step(batch)
-            self.write_summary(self.train_summary_writer, summary_dict)
-            self.ckpt.train_time.assign_add(time.time() - t0)
-            t0 = time.time()
+            metrics = self.model.train_step(batch)
+            if self.ckpt.step.numpy() % self.train_summary_every == 0:
+                self.write_summary(self.train_summary_writer, metrics)
 
-        if val_dataset is not None:
-            summaries = {}
-            for batch in progressbar.progressbar(val_dataset):
-                summary_dict, output = self.model.val_step(batch)
-                for k, v in summary_dict.items():
-                    if k not in summaries:
-                        summaries[k] = []
-                    summaries[k].append(v)
-            mean_summary_dict = dict([(k, tf.math.reduce_mean(v)) for (k, v) in summaries.items()])
-            self.write_summary(self.test_summary_writer, mean_summary_dict)
+            if self.ckpt.step.numpy() % self.validation_summary_every == 0:
+                summaries = {}
+                for i in range(self.validation_size):
+                    batch = next(validation_iterator)
+                    metrics = self.model.val_step(batch)
+                    for k, v in metrics.items():
+                        if k not in summaries:
+                            summaries[k] = []
+                        summaries[k].append(v)
+                mean_summary_dict = dict([(k, tf.math.reduce_mean(v)) for (k, v) in summaries.items()])
+                self.write_summary(self.test_summary_writer, mean_summary_dict)
+
+            self.ckpt.train_time.assign_add(time.time() - t0)
+
+        # End of epoch
+        if self.validation_on_end_of_epoch:
+            self.validation(progressbar.progressbar(val_dataset))
 
         save_path = self.manager.save()
         print("Saved checkpoint for step {}: {}".format(int(self.ckpt.step), save_path))
-        print("loss {:1.3f}".format(summary_dict['loss'].numpy()))
+
+    def validation(self, iterable):
+        summaries = {}
+        for batch in iterable:
+            metrics = self.model.val_step(batch)
+            for k, v in metrics.items():
+                if k not in summaries:
+                    summaries[k] = []
+                summaries[k].append(v)
+        mean_summary_dict = dict([(k, tf.math.reduce_mean(v)) for (k, v) in summaries.items()])
+        self.write_summary(self.test_summary_writer, mean_summary_dict)
 
     def train(self, train_dataset, validation_dataset):
         self.build_model(train_dataset)
         self.count_params()
-        # dataset = dataset.shuffle(10000)
 
-        # batched_ds = dataset.batch(self.batch_size, drop_remainder=True).prefetch(64)
         batched_train_dataset = train_dataset.batch(self.batch_size).prefetch(64)
         if validation_dataset is not None:
             batched_validation_dataset = validation_dataset.batch(self.batch_size).prefetch(64)
