@@ -197,7 +197,7 @@ def calc_metrics(output, batch):
     precision_metric(y_true=batch['gt_occ'], y_pred=output['predicted_occ'])
     precision = precision_metric.result().numpy()
 
-    recall_metric = tf.keras.metrics.Precision(thresholds=0.5)
+    recall_metric = tf.keras.metrics.Recall(thresholds=0.5)
     recall_metric(y_true=batch['gt_occ'], y_pred=output['predicted_occ'])
     recall = recall_metric.result().numpy()
 
