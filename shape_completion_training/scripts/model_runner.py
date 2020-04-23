@@ -53,7 +53,11 @@ def train_func(args, seed: int):
           metrics_function=make_metrics_function(sigmoid_cross_entropy_with_logits),
           checkpoint=args.checkpoint,
           log_path=log_path,
-          log_scalars_every=args.log_scalars_every)
+          log_scalars_every=args.log_scalars_every,
+          validation_every=args.log_scalars_every,
+          validation_size=100,
+          validate_on_epoch_end=True,
+          )
 
 
 def eval_func(args, seed: int):
@@ -101,7 +105,7 @@ def main():
     train_parser.add_argument('--take', type=int, help='take a subset of the dataset')
     train_parser.add_argument('--shard', type=int, help='take every nth element of the dataset')
     train_parser.add_argument('--verbose', '-v', action='count', default=0)
-    train_parser.add_argument('--log-scalars-every', type=int, help='loss/accuracy every this many steps/batches', default=500)
+    train_parser.add_argument('--log-scalars-every', type=int, help='loss/accuracy every this many steps/batches', default=100)
     train_parser.set_defaults(func=train_func)
 
     eval_parser = subparsers.add_parser('eval')
