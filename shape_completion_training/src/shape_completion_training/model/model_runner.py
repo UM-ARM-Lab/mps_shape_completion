@@ -188,4 +188,4 @@ class ModelRunner:
         self.count_params()
 
     def evaluate(self, dataset):
-        self.model.evaluate(dataset.batch(self.batch_size, drop_remainder=True))
+        self.validation(dataset.batch(self.batch_size, drop_remainder=True))
