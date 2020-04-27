@@ -94,7 +94,7 @@ class ModelRunner:
         self.restore()
 
     def restore(self):
-        status = self.ckpt.restore(self.manager.latest_checkpoint)
+        status = self.ckpt.restore(self.manager.latest_checkpoint).expect_partial()
 
         # Suppress warning 
         if self.manager.latest_checkpoint:
