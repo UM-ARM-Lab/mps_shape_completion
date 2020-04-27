@@ -12,8 +12,8 @@ from ycb_video_pytools import ycb_video_dataset
 
 def train_main(args, seed):
     dataset = ycb_video_dataset.YCBReconstructionDataset(args.dataset_dir)
-    tf_train_dataset = dataset.load(mode='train')
-    tf_validation_dataset = dataset.load(mode='val')
+    tf_train_dataset = dataset.load(mode='train', take=args.take)
+    tf_validation_dataset = dataset.load(mode='val', take=args.take)
 
     model_params = json.load(open(args.model_params, 'r'))
     net = ModelRunner(model_params,
@@ -46,6 +46,7 @@ if __name__ == "__main__":
     train_subparser.add_argument('dataset_dir', help='dataset directory', type=pathlib.Path, nargs='+')
     train_subparser.add_argument('model_params', type=pathlib.Path)
     train_subparser.add_argument('--seed', type=int)
+    train_subparser.add_argument('--take', type=int)
     train_subparser.add_argument('--summary-every', type=int, default=500)
     train_subparser.add_argument('--validation-size', type=int, default=100)
     train_subparser.add_argument('-l', '--trial-name', default='nickname')
