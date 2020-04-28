@@ -70,7 +70,7 @@ class VoxelCNN(tf.keras.Model):
             with tf.GradientTape() as tape:
                 output = self(batch, training=True)
 
-                metrics = nn.calc_metrics(output, batch)
+                metrics = nn.calc_metrics(output,, batch,
                 
                 if self.params['loss'] == 'cross_entropy':
                     loss = tf.reduce_sum(tf.keras.losses.binary_crossentropy(batch['gt_occ'],
@@ -138,7 +138,7 @@ class StackedVoxelCNN:
             with tf.GradientTape() as tape:
                 output = self(batch)
 
-                metrics = nn.calc_metrics(output, batch)
+                metrics = nn.calc_metrics(output,, batch,
                 
                 if self.params['loss'] == 'cross_entropy':
                     cross_ent = tf.keras.losses.binary_crossentropy(batch['gt_occ'],
@@ -165,7 +165,7 @@ class StackedVoxelCNN:
         def step_fn_multiloss(batch):
             with tf.GradientTape() as tape:
                 output = self(batch)
-                metrics = nn.calc_metrics(output, batch)
+                metrics = nn.calc_metrics(output,, batch,
                 loss = tf.reduce_sum(tf.keras.losses.binary_crossentropy(batch['gt_occ'],
                                                                          output['predicted_occ']))
                 loss = loss / self.batch_size

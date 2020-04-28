@@ -164,7 +164,7 @@ class ModelRunner:
 
     def train(self, train_dataset, validation_dataset):
         self.build_model(train_dataset)
-        self.count_params()
+        # self.count_params()
 
         batched_train_dataset = train_dataset.batch(self.batch_size, drop_remainder=True).prefetch(64)
         if validation_dataset is not None:

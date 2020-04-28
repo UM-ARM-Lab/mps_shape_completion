@@ -1,7 +1,8 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras.layers as tfl
-import tensorflow_addons as tfa
+
+from shape_completion_training.model.nn_tools import IOUMetric, F1Metric, PrecisionMetric, RecallMetric, reduce
 
 
 def stack_known(inp):
@@ -25,60 +26,6 @@ def compute_vae_loss(z, mean, logvar, sample_logit, labels):
     logpz = log_normal_pdf(z, 0., 0.)
     logqz_x = log_normal_pdf(z, mean, logvar)
     return -tf.reduce_mean(logpx_z + logpz - logqz_x)
-
-
-class MyMetric:
-    def __call__(self, batch, output):
-        raise NotImplementedError()
-
-
-class IOUMetric:
-    def __init__(self):
-        self.keras_metric = tf.metrics.MeanIoU(num_classes=2)
-
-    def __call__(self, batch, output):
-        y_pred = tf.cast(output['predicted_occ'] > 0.5, tf.float32)
-        y_true = batch['gt_occ']
-        self.keras_metric.reset_states()
-        return self.keras_metric(y_true=y_true, y_pred=y_pred)
-
-
-class F1Metric:
-    def __init__(self):
-        self.keras_metric = tfa.metrics.F1Score(num_classes=1, threshold=0.5, average=None)
-
-    def __call__(self, batch, output):
-        y_true = tf.reshape(batch['gt_occ'], [-1, 1])
-        y_pred = tf.reshape(output['predicted_occ'], [-1, 1])
-        self.keras_metric.reset_states()
-        return self.keras_metric(y_true=y_true, y_pred=y_pred)
-
-
-class PrecisionMetric:
-    def __init__(self):
-        self.keras_metric = tf.metrics.Precision(thresholds=0.5)
-
-    def __call__(self, batch, output):
-        y_pred = output['predicted_occ']
-        y_true = batch['gt_occ']
-        self.keras_metric.reset_states()
-        return self.keras_metric(y_true=y_true, y_pred=y_pred)
-
-
-class RecallMetric:
-    def __init__(self):
-        self.keras_metric = tf.metrics.Recall(thresholds=0.5)
-
-    def __call__(self, batch, output):
-        y_pred = output['predicted_occ']
-        y_true = batch['gt_occ']
-        self.keras_metric.reset_states()
-        return self.keras_metric(y_true=y_true, y_pred=y_pred)
-
-
-@tf.function
-def reduce(x):
-    return tf.reduce_mean(x)
 
 
 class VAE(tf.keras.Model):
@@ -194,7 +141,7 @@ class VAE_GAN(VAE):
         gp = tf.reduce_mean((slopes - 1.) ** 2)
         return gp
 
-    def calc_metrics(self, batch, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, gp, output, vae_loss):
+    def calc_metrics(self, batch, output, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, gp, vae_loss):
         metric_values = {}
         for name, metric in self.metrics_info.items():
             metric_values[name] = metric(batch=batch, output=output)
@@ -205,6 +152,7 @@ class VAE_GAN(VAE):
         metric_values['loss/gan_d_no_gp'] = gan_loss_d_no_gp
         return metric_values
 
+    @tf.function
     def forward_pass(self, batch):
         ##### Forward pass
         known = stack_known(batch)
@@ -226,12 +174,12 @@ class VAE_GAN(VAE):
         gan_loss_d = gan_loss_d_no_gp + gp
         generator_loss = vae_loss + gan_loss_g
         dis_loss = gan_loss_d
-        return dis_loss, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, generator_loss, gp, output, vae_loss
+        return output, dis_loss, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, generator_loss, gp, vae_loss
 
     def val_step(self, batch):
-        dis_loss, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, generator_loss, gp, output, vae_loss = self.forward_pass(batch)
+        output, dis_loss, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, generator_loss, gp, vae_loss = self.forward_pass(batch)
         loss = dis_loss
-        metric_values = self.calc_metrics(batch, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, gp, output, vae_loss)
+        metric_values = self.calc_metrics(batch, output, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, gp, vae_loss)
 
         reduced_metrics = {k: reduce(metric_values[k]) for k in metric_values}
         reduced_metrics['loss'] = loss
@@ -244,10 +192,10 @@ class VAE_GAN(VAE):
             # Loss & Outputs
             with tf.GradientTape(persistent=True) as tape:
                 losses = self.forward_pass(batch)
-                dis_loss, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, generator_loss, gp, output, vae_loss = losses
+                output, dis_loss, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, generator_loss, gp, vae_loss = losses
 
             # Metrics
-            metric_values = self.calc_metrics(batch, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, gp, output, vae_loss)
+            metric_values = self.calc_metrics(batch, output, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, gp, vae_loss)
 
             ### apply
             vae_variables = self.encoder.trainable_variables + self.generator.trainable_variables

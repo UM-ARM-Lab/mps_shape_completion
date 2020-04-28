@@ -1,6 +1,7 @@
 import tensorflow as tf
 import tensorflow.keras.layers as tfl
-import shape_completion_training.model.nn_tools as nn
+
+from shape_completion_training.model.nn_tools import IOUMetric, F1Metric, PrecisionMetric, RecallMetric, reduce_sum_batch, reduce
 
 
 class AutoEncoder(tf.keras.Model):
@@ -12,6 +13,13 @@ class AutoEncoder(tf.keras.Model):
         self.setup_model()
         self.batch_size = batch_size
         self.opt = tf.keras.optimizers.Adam(0.001)
+
+        self.metrics_info = {
+            'IoU': IOUMetric(),
+            'F1Score': F1Metric(),
+            'Precision': PrecisionMetric(),
+            'Recall': RecallMetric(),
+        }
 
     # what the heck is this for
     def get_model(self):
@@ -136,79 +144,68 @@ class AutoEncoder(tf.keras.Model):
 
     @tf.function
     def mse_loss(self, metrics):
-        l_occ = nn.reduce_sum_batch(metrics['mse/occ'])
-        l_free = nn.reduce_sum_batch(metrics['mse/free'])
+        l_occ = reduce_sum_batch(metrics['mse/occ'])
+        l_free = reduce_sum_batch(metrics['mse/free'])
         return l_occ + l_free
 
     @tf.function
+    def forward_pass(self, batch):
+        output_logits = self(batch, training=True)
+
+        x = tf.nn.sigmoid(output_logits['predicted_occ'])
+
+        output = {'predicted_occ': x, 'predicted_free': 1 - x}
+
+        loss = None
+        if self.params['loss'] == 'mse':
+            raise NotImplementedError()
+        elif self.params['loss'] == 'cross_entropy':
+            cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=output_logits['predicted_occ'],
+                                                                labels=batch['gt_occ'])
+            loss = reduce_sum_batch(cross_ent)
+
+        if self.params['flooding_level'] is not None:
+            loss = tf.math.abs(loss - self.params['flooding_level']) + self.params['flooding_level']
+
+        return output, loss
+
+    @tf.function
     def val_step(self, batch):
-        def reduce(val):
-            return tf.reduce_mean(val)
+        output, loss = self.forward_pass(batch)
+        metric_values = self.calc_metrics(batch, output, loss)
 
-        def step_fn(batch):
-            output_logits = self(batch, training=True)
-
-            x = tf.nn.sigmoid(output_logits['predicted_occ'])
-
-            output = {'predicted_occ': x, 'predicted_free': 1 - x}
-
-            metrics = nn.calc_metrics(output, batch)
-
-            if self.params['loss'] == 'mse':
-                loss = self.mse_loss(metrics)
-
-            elif self.params['loss'] == 'cross_entropy':
-                cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=output_logits['predicted_occ'],
-                                                                    labels=batch['gt_occ'])
-                loss = nn.reduce_sum_batch(cross_ent)
-
-            if self.params['flooding_level'] is not None:
-                loss = tf.math.abs(loss - self.params['flooding_level']) + self.params['flooding_level']
-
-            return loss, metrics, output
-
-        loss, metrics, output = step_fn(batch)
-        m = {k: reduce(metrics[k]) for k in metrics}
-        m['loss'] = loss
-        return m, output
+        reduced_metrics = {k: reduce(metric_values[k]) for k in metric_values}
+        reduced_metrics['loss'] = loss
+        return reduced_metrics
 
     @tf.function
     def train_step(self, batch):
-        def reduce(val):
-            return tf.reduce_mean(val)
-
+        @tf.function
         def step_fn(batch):
-            with tf.GradientTape() as tape:
-                output_logits = self(batch, training=True)
+            with tf.GradientTape(persistent=True) as tape:
+                output, loss = self.forward_pass(batch)
 
-                x = tf.nn.sigmoid(output_logits['predicted_occ'])
+            # Metrics
+            metric_values = self.calc_metrics(batch, output, loss)
 
-                output = {'predicted_occ': x, 'predicted_free': 1 - x}
+            variables = self.trainable_variables
+            gradients = tape.gradient(loss, variables)
 
-                metrics = nn.calc_metrics(output, batch)
+            self.opt.apply_gradients(list(zip(gradients, variables)))
 
-                if self.params['loss'] == 'mse':
-                    loss = self.mse_loss(metrics)
-
-                elif self.params['loss'] == 'cross_entropy':
-                    cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=output_logits['predicted_occ'],
-                                                                        labels=batch['gt_occ'])
-                    loss = nn.reduce_sum_batch(cross_ent)
-
-                if self.params['flooding_level'] is not None:
-                    loss = tf.math.abs(loss - self.params['flooding_level']) + self.params['flooding_level']
-
-                variables = self.trainable_variables
-                gradients = tape.gradient(loss, variables)
-
-                self.opt.apply_gradients(list(zip(gradients, variables)))
-                metrics.update(self.get_insights(variables, gradients))
-                return loss, metrics
+            return loss, metric_values
 
         loss, metrics = step_fn(batch)
-        m = {k: reduce(metrics[k]) for k in metrics}
-        m['loss'] = loss
-        return m
+        reduced_metrics = {k: reduce(metrics[k]) for k in metrics}
+        reduced_metrics['loss'] = loss
+        return reduced_metrics
+
+    def calc_metrics(self, batch, output, loss):
+        metric_values = {}
+        for name, metric in self.metrics_info.items():
+            metric_values[name] = metric(batch=batch, output=output)
+        metric_values['loss'] = loss
+        return metric_values
 
     @tf.function
     def get_insights(self, variables, gradients):

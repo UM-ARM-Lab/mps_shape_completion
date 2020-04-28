@@ -248,3 +248,52 @@ def make_metrics_function(loss_function):
         return metrics
 
     return _metrics
+
+
+class IOUMetric:
+    def __init__(self):
+        self.keras_metric = tf.metrics.MeanIoU(num_classes=2)
+
+    def __call__(self, batch, output):
+        y_pred = tf.cast(output['predicted_occ'] > 0.5, tf.float32)
+        y_true = batch['gt_occ']
+        self.keras_metric.reset_states()
+        return self.keras_metric(y_true=y_true, y_pred=y_pred)
+
+
+class F1Metric:
+    def __init__(self):
+        self.keras_metric = tfa.metrics.F1Score(num_classes=1, threshold=0.5, average=None)
+
+    def __call__(self, batch, output):
+        y_true = tf.reshape(batch['gt_occ'], [-1, 1])
+        y_pred = tf.reshape(output['predicted_occ'], [-1, 1])
+        self.keras_metric.reset_states()
+        return self.keras_metric(y_true=y_true, y_pred=y_pred)
+
+
+class PrecisionMetric:
+    def __init__(self):
+        self.keras_metric = tf.metrics.Precision(thresholds=0.5)
+
+    def __call__(self, batch, output):
+        y_pred = output['predicted_occ']
+        y_true = batch['gt_occ']
+        self.keras_metric.reset_states()
+        return self.keras_metric(y_true=y_true, y_pred=y_pred)
+
+
+class RecallMetric:
+    def __init__(self):
+        self.keras_metric = tf.metrics.Recall(thresholds=0.5)
+
+    def __call__(self, batch, output):
+        y_pred = output['predicted_occ']
+        y_true = batch['gt_occ']
+        self.keras_metric.reset_states()
+        return self.keras_metric(y_true=y_true, y_pred=y_pred)
+
+
+@tf.function
+def reduce(x):
+    return tf.reduce_mean(x)
