@@ -185,35 +185,48 @@ class VAE_GAN(VAE):
         reduced_metrics['loss'] = loss
         return reduced_metrics
 
-    @tf.function
-    def train_step(self, batch):
-        @tf.function
-        def step_fn(batch):
-            # Loss & Outputs
-            with tf.GradientTape(persistent=True) as tape:
-                losses = self.forward_pass(batch)
-                output, dis_loss, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, generator_loss, gp, vae_loss = losses
+    # @tf.function
+    # def train_step(self, batch):
+    #     with tf.GradientTape(persistent=True) as tape:
+    #         losses = self.forward_pass(batch)
 
-            # Metrics
-            metric_values = self.calc_metrics(batch, output, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, gp, vae_loss)
+    loss_function()
+        return dis_loss, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, generator_loss, gp, vae_loss = losses
 
-            ### apply
-            vae_variables = self.encoder.trainable_variables + self.generator.trainable_variables
-            vae_gradients = tape.gradient(generator_loss, vae_variables)
-            clipped_vae_gradients = [tf.clip_by_value(g, -1e6, 1e6) for g in vae_gradients]
-            self.opt.apply_gradients(list(zip(clipped_vae_gradients, vae_variables)))
+    def optimizers():
 
-            dis_variables = self.discriminator.trainable_variables
-            dis_gradients = tape.gradient(dis_loss, dis_variables)
-            clipped_dis_gradients = [tf.clip_by_value(g, -1e6, 1e6) for g in dis_gradients]
-            self.gan_opt.apply_gradients(list(zip(clipped_dis_gradients, dis_variables)))
+    def apply_gradients_and_return_metrics(self, ..., losses):
+        # Metrics
+        gan_loss_d, gan_loss_d_no_gp, gan_loss_g, gp, vae_loss = losses
+        metric_values = self.calc_metrics(batch, output, gan_loss_d, gan_loss_d_no_gp, gan_loss_g, gp, vae_loss)
 
-            return generator_loss, metric_values
+        ### apply
+        vae_variables = self.encoder.trainable_variables + self.generator.trainable_variables
+        vae_gradients = tape.gradient(generator_loss, vae_variables)
+        clipped_vae_gradients = [tf.clip_by_value(g, -1e6, 1e6) for g in vae_gradients]
+        self.opt.apply_gradients(list(zip(clipped_vae_gradients, vae_variables)))
 
-        loss, metrics = step_fn(batch)
-        reduced_metrics = {k: reduce(metrics[k]) for k in metrics}
-        reduced_metrics['loss'] = loss
-        return reduced_metrics
+        dis_variables = self.discriminator.trainable_variables
+        dis_gradients = tape.gradient(dis_loss, dis_variables)
+        clipped_dis_gradients = [tf.clip_by_value(g, -1e6, 1e6) for g in dis_gradients]
+        self.gan_opt.apply_gradients(list(zip(clipped_dis_gradients, dis_variables)))
+
+        return generator_loss, metric_values
+
+
+def vae_gan_apply_gradients(keras_model, tape, optimizers, losses):
+    opt, gan_opt = optimizers
+    generator_loss, dis_loss = losses
+    vae_variables = keras_model.encoder.trainable_variables + keras_model.generator.trainable_variables
+    vae_gradients = tape.gradient(generator_loss, vae_variables)
+    clipped_vae_gradients = [tf.clip_by_value(g, -1e6, 1e6) for g in vae_gradients]
+    opt.apply_gradients(list(zip(clipped_vae_gradients, vae_variables)))
+
+    dis_variables = keras_model.discriminator.trainable_variables
+    dis_gradients = tape.gradient(dis_loss, dis_variables)
+    clipped_dis_gradients = [tf.clip_by_value(g, -1e6, 1e6) for g in dis_gradients]
+    gan_opt.apply_gradients(list(zip(clipped_dis_gradients, dis_variables)))
+
 
 
 def make_encoder(inp_shape, params):
