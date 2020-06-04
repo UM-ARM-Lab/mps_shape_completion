@@ -60,6 +60,7 @@ def load_trial(trial_path):
     if not trial_path.is_dir():
         raise ValueError("Cannot load, the path {} is not an existing directory".format(trial_path))
 
+    trial_path = trial_path.parent
     params_filename = trial_path / 'params.json'
     with params_filename.open("r") as params_file:
         params = json.load(params_file)

@@ -45,9 +45,7 @@ class ModelRunner:
                  trial_path=None,
                  params=None,
                  trials_directory=None,
-                 restore_from_best=False,
                  write_summary=True):
-        self.restore_from_best = restore_from_best
         self.model = model
         self.side_length = 64
         self.num_voxels = self.side_length ** 3
@@ -58,6 +56,9 @@ class ModelRunner:
                                                                            trial_path=trial_path,
                                                                            trials_directory=trials_directory,
                                                                            write_summary=write_summary)
+        self.restore_from_best = False  # default
+        if trial_path is not None:
+            self.restore_from_best = (trial_path.name == 'best_checkpoint')
         self.group_name = self.trial_path.parts[-2]
 
         self.train_summary_writer = tf.summary.create_file_writer((self.trial_path / "logs/train").as_posix())
@@ -69,12 +70,12 @@ class ModelRunner:
         self.latest_ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                                                epoch=tf.Variable(0),
                                                train_time=tf.Variable(0.0),
-                                               best_key_metric_value=tf.Variable(10000.0),
+                                               best_key_metric_value=None,
                                                model=self.model)
         self.best_ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                                              epoch=tf.Variable(0),
                                              train_time=tf.Variable(0.0),
-                                             best_key_metric_value=tf.Variable(10000.0),
+                                             best_key_metric_value=None,
                                              model=self.model)
         self.latest_checkpoint_path = self.trial_path / "latest_checkpoint"
         self.best_checkpoint_path = self.trial_path / "best_checkpoint"

@@ -67,9 +67,9 @@ class MyKerasModel(tf.keras.Model):
 
         return train_outputs, metrics
 
-    @tf.function
+    # @tf.function
     def val_step(self, val_element):
-        train_outputs = self.call(val_element, training=True)
+        train_outputs = self.call(val_element, training=False)
         train_losses = self.compute_loss(val_element, train_outputs)
         other_metrics = self.calculate_metrics(val_element, train_outputs)
 
