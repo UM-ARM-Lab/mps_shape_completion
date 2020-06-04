@@ -209,8 +209,8 @@ class ModelRunner:
 
                 # Validation at end of epoch
                 valdation_metrics = self.val_epoch(val_dataset)
-                key_metric_value = valdation_metrics[key_metric.key()]
-                if key_metric.is_better_than(key_metric_value, self.best_ckpt.best_key_metric_value):
+                key_metric_value = valdation_metrics[self.key_metric.key()]
+                if self.key_metric.is_better_than(key_metric_value, self.best_ckpt.best_key_metric_value):
                     self.best_ckpt.best_key_metric_value.assign(key_metric_value)
                     self.latest_ckpt.best_key_metric_value.assign(key_metric_value)
                     save_path = self.best_checkpoint_manager.save()
