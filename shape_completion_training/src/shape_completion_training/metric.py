@@ -11,18 +11,24 @@ class Metric:
     def key():
         raise NotImplementedError()
 
+    @staticmethod
+    def worst():
+        raise NotImplementedError()
+
 
 class LossMetric(Metric):
 
     @staticmethod
     def is_better_than(a, b):
-        if b is None:
-            return True
         return a < b
 
     @staticmethod
     def key():
         return "loss"
+
+    @staticmethod
+    def worst():
+        return 1000
 
 
 class AccuracyMetric(Metric):
@@ -36,6 +42,10 @@ class AccuracyMetric(Metric):
     @staticmethod
     def key():
         return "accuracy"
+
+    @staticmethod
+    def worst():
+        return 0
 
 
 def recall(y_true, y_pred, threshold=0.5):

@@ -45,11 +45,14 @@ class ModelRunner:
                  trial_path=None,
                  params=None,
                  trials_directory=None,
-                 write_summary=True):
+                 write_summary=True,
+                 key_metric=LossMetric,
+                 ):
         self.model = model
         self.side_length = 64
         self.num_voxels = self.side_length ** 3
         self.training = training
+        self.key_metric = key_metric
 
         self.trial_path, self.params = filepath_tools.create_or_load_trial(group_name=group_name,
                                                                            params=params,
@@ -70,12 +73,12 @@ class ModelRunner:
         self.latest_ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                                                epoch=tf.Variable(0),
                                                train_time=tf.Variable(0.0),
-                                               best_key_metric_value=None,
+                                               best_key_metric_value=tf.Variable(self.key_metric.worst()),
                                                model=self.model)
         self.best_ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                                              epoch=tf.Variable(0),
                                              train_time=tf.Variable(0.0),
-                                             best_key_metric_value=None,
+                                             best_key_metric_value=tf.Variable(self.key_metric.worst()),
                                              model=self.model)
         self.latest_checkpoint_path = self.trial_path / "latest_checkpoint"
         self.best_checkpoint_path = self.trial_path / "best_checkpoint"
@@ -186,7 +189,7 @@ class ModelRunner:
         print(Style.BRIGHT + "val loss {:9.4f}".format(mean_val_metrics['loss'].numpy()) + Style.NORMAL)
         return mean_val_metrics
 
-    def train(self, train_dataset, val_dataset, num_epochs, key_metric=LossMetric):
+    def train(self, train_dataset, val_dataset, num_epochs):
         self.build_model(train_dataset)
         self.count_params()
 
