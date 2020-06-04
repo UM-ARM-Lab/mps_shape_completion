@@ -73,12 +73,12 @@ class ModelRunner:
         self.latest_ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                                                epoch=tf.Variable(0),
                                                train_time=tf.Variable(0.0),
-                                               best_key_metric_value=tf.Variable(self.key_metric.worst()),
+                                               best_key_metric_value=tf.Variable(self.key_metric.worst(), dtype=tf.float32),
                                                model=self.model)
         self.best_ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                                              epoch=tf.Variable(0),
                                              train_time=tf.Variable(0.0),
-                                             best_key_metric_value=tf.Variable(self.key_metric.worst()),
+                                             best_key_metric_value=tf.Variable(self.key_metric.worst(), dtype=tf.float32),
                                              model=self.model)
         self.latest_checkpoint_path = self.trial_path / "latest_checkpoint"
         self.best_checkpoint_path = self.trial_path / "best_checkpoint"
