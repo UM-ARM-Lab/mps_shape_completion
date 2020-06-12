@@ -47,7 +47,9 @@ class ModelRunner:
                  trials_directory=None,
                  write_summary=True,
                  key_metric=LossMetric,
+                 val_every_n_batches=1000,
                  ):
+        self.val_every_n_batches = val_every_n_batches
         self.model = model
         self.side_length = 64
         self.num_voxels = self.side_length ** 3
@@ -64,8 +66,8 @@ class ModelRunner:
             self.restore_from_best = (trial_path.name == 'best_checkpoint')
         self.group_name = self.trial_path.parts[-2]
 
-        self.train_summary_writer = tf.summary.create_file_writer((self.trial_path / "logs/train").as_posix())
-        self.val_summary_writer = tf.summary.create_file_writer((self.trial_path / "logs/val").as_posix())
+        self.val_summary_writer = tf.summary.create_file_writer((self.trial_path / "logs/1_val").as_posix())
+        self.train_summary_writer = tf.summary.create_file_writer((self.trial_path / "logs/2_train").as_posix())
 
         self.num_train_batches = None
         self.num_val_batches = None
@@ -104,6 +106,7 @@ class ModelRunner:
 
     def restore_latest(self):
         status = self.latest_ckpt.restore(self.latest_checkpoint_manager.latest_checkpoint)
+        self.best_ckpt.best_key_metric_value = self.latest_ckpt.best_key_metric_value
         if self.latest_checkpoint_manager.latest_checkpoint is not None:
             print(Fore.CYAN + "Restoring latest {}".format(self.latest_checkpoint_manager.latest_checkpoint) + Fore.RESET)
 
@@ -151,7 +154,7 @@ class ModelRunner:
         with progressbar.ProgressBar(widgets=widgets, max_value=self.num_train_batches) as bar:
             self.num_train_batches = 0
             t0 = time.time()
-            for train_batch in train_dataset:
+            for batch_idx, train_batch in enumerate(train_dataset):
                 self.num_train_batches += 1
                 self.latest_ckpt.step.assign_add(1)
 
@@ -161,6 +164,9 @@ class ModelRunner:
                 self.write_train_summary(train_batch_metrics)
                 self.latest_ckpt.train_time.assign_add(time.time() - t0)
                 t0 = time.time()
+
+                if batch_idx % self.val_every_n_batches == 0 and batch_idx > 0:
+                    self.val_epoch(val_dataset)
 
     def val_epoch(self, val_dataset):
         if self.num_val_batches is not None:
@@ -186,7 +192,7 @@ class ModelRunner:
         val_metrics = sequence_of_dicts_to_dict_of_sequences(val_metrics)
         mean_val_metrics = reduce_mean_dict(val_metrics)
         self.write_val_summary(mean_val_metrics)
-        print(Style.BRIGHT + "val loss {:9.4f}".format(mean_val_metrics['loss'].numpy()) + Style.NORMAL)
+        print(Style.BRIGHT + "val loss {:9.5f}".format(mean_val_metrics['loss'].numpy()) + Style.NORMAL)
         return mean_val_metrics
 
     def train(self, train_dataset, val_dataset, num_epochs):

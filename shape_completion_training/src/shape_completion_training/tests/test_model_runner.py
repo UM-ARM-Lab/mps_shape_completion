@@ -4,7 +4,7 @@ import tensorflow as tf
 
 from shape_completion_training.model.utils import reduce_mean_dict
 from shape_completion_training.model_runner import ModelRunner
-from shape_completion_training.mykerasmodel import MyKerasModel
+from shape_completion_training.my_keras_model import MyKerasModel
 
 params = {
     'learning_rate': 0.1,
