@@ -1,21 +1,18 @@
+import datetime
+import time
+
+import progressbar
+import tensorflow as tf
 from colorama import Style, Fore
 
 from shape_completion_training.metric import LossMetric
-from shape_completion_training.model import utils
-from shape_completion_training.model.utils import reduce_mean_dict, sequence_of_dicts_to_dict_of_sequences
-
-utils.set_gpu_with_lowest_memory()
-import tensorflow as tf
-from shape_completion_training.model import filepath_tools
-from shape_completion_training.model.auto_encoder import AutoEncoder
-from shape_completion_training.model.augmented_ae import Augmented_VAE
-from shape_completion_training.model.voxelcnn import VoxelCNN
-from shape_completion_training.model.vae import VAE, VAE_GAN
-from shape_completion_training.model.conditional_vcnn import ConditionalVCNN
 from shape_completion_training.model.ae_vcnn import AE_VCNN
-import progressbar
-import datetime
-import time
+from shape_completion_training.model.augmented_ae import Augmented_VAE
+from shape_completion_training.model.auto_encoder import AutoEncoder
+from shape_completion_training.model.conditional_vcnn import ConditionalVCNN
+from shape_completion_training.model.utils import reduce_mean_dict, sequence_of_dicts_to_dict_of_sequences
+from shape_completion_training.model.vae import VAE, VAE_GAN
+from shape_completion_training.model.voxelcnn import VoxelCNN
 
 
 def get_model_type(network_type):
@@ -41,11 +38,8 @@ class ModelRunner:
     def __init__(self,
                  model,
                  training,
-                 group_name=None,
-                 trial_path=None,
-                 params=None,
-                 trials_directory=None,
-                 write_summary=True,
+                 trial_path,
+                 params,
                  key_metric=LossMetric,
                  val_every_n_batches=1000,
                  ):
@@ -55,12 +49,9 @@ class ModelRunner:
         self.num_voxels = self.side_length ** 3
         self.training = training
         self.key_metric = key_metric
+        self.trial_path = trial_path
+        self.params = params
 
-        self.trial_path, self.params = filepath_tools.create_or_load_trial(group_name=group_name,
-                                                                           params=params,
-                                                                           trial_path=trial_path,
-                                                                           trials_directory=trials_directory,
-                                                                           write_summary=write_summary)
         self.restore_from_best = False  # default
         if trial_path is not None:
             self.restore_from_best = (trial_path.name == 'best_checkpoint')
@@ -165,7 +156,7 @@ class ModelRunner:
                 self.latest_ckpt.train_time.assign_add(time.time() - t0)
                 t0 = time.time()
 
-                if batch_idx % self.val_every_n_batches == 0 and batch_idx > 0:
+                if self.latest_ckpt.epoch <= 1 and batch_idx % self.val_every_n_batches == 0 and batch_idx > 0:
                     self.val_epoch(val_dataset)
 
     def val_epoch(self, val_dataset):
@@ -192,7 +183,8 @@ class ModelRunner:
         val_metrics = sequence_of_dicts_to_dict_of_sequences(val_metrics)
         mean_val_metrics = reduce_mean_dict(val_metrics)
         self.write_val_summary(mean_val_metrics)
-        print(Style.BRIGHT + "val loss {:9.5f}".format(mean_val_metrics['loss'].numpy()) + Style.NORMAL)
+        mean_val_loss = mean_val_metrics['loss'].numpy()
+        print(Style.BRIGHT + "val loss {}".format(mean_val_loss) + Style.NORMAL)
         return mean_val_metrics
 
     def train(self, train_dataset, val_dataset, num_epochs):
