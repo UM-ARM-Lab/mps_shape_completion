@@ -135,7 +135,7 @@ class ModelRunner:
             max_size = '???'
 
         widgets = [
-            '  ', progressbar.Counter(), '/', max_size,
+            ' TRAIN ', progressbar.Counter(), '/', max_size,
             ' ', progressbar.Variable("Loss"), ' ',
             progressbar.Bar(),
             ' [', progressbar.Variable("TrainTime"), '] ',
@@ -166,7 +166,7 @@ class ModelRunner:
             max_size = '???'
 
         widgets = [
-            '  ', progressbar.Counter(), '/', max_size,
+            ' VAL   ', progressbar.Counter(), '/', max_size,
             progressbar.Bar(),
             ' (', progressbar.ETA(), ') ',
         ]
@@ -183,8 +183,6 @@ class ModelRunner:
         val_metrics = sequence_of_dicts_to_dict_of_sequences(val_metrics)
         mean_val_metrics = reduce_mean_dict(val_metrics)
         self.write_val_summary(mean_val_metrics)
-        mean_val_loss = mean_val_metrics['loss'].numpy()
-        print(Style.BRIGHT + "val loss {}".format(mean_val_loss) + Style.NORMAL)
         return mean_val_metrics
 
     def train(self, train_dataset, val_dataset, num_epochs):
@@ -194,7 +192,9 @@ class ModelRunner:
         last_epoch = self.latest_ckpt.epoch + num_epochs
         try:
             # Validation before anything
-            self.val_epoch(val_dataset)
+            valdation_metrics = self.val_epoch(val_dataset)
+            key_metric_value = valdation_metrics[self.key_metric.key()]
+            print(Style.BRIGHT + "Val: {}={}".format(self.key_metric.key(), key_metric_value) + Style.NORMAL)
 
             while self.latest_ckpt.epoch < last_epoch:
                 # Training
@@ -208,6 +208,7 @@ class ModelRunner:
                 # Validation at end of epoch
                 valdation_metrics = self.val_epoch(val_dataset)
                 key_metric_value = valdation_metrics[self.key_metric.key()]
+                print(Style.BRIGHT + "Val: {}={}".format(self.key_metric.key(), key_metric_value) + Style.NORMAL)
                 if self.key_metric.is_better_than(key_metric_value, self.best_ckpt.best_key_metric_value):
                     self.best_ckpt.best_key_metric_value.assign(key_metric_value)
                     self.latest_ckpt.best_key_metric_value.assign(key_metric_value)
