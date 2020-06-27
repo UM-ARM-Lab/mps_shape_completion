@@ -62,7 +62,10 @@ class ModelRunner:
         self.overall_job_start_time = time.time()
         self.latest_hour = 0
         self.validate_first = validate_first
-        self.batch_metadata = batch_metadata
+        if batch_metadata is None:
+            self.batch_metadata = {}
+        else:
+            self.batch_metadata = batch_metadata
         self.restore_from_name = restore_from_name
 
         self.group_name = self.trial_path.parts[-2]
