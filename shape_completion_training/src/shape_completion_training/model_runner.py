@@ -97,11 +97,11 @@ class ModelRunner:
 
         if self.restore_from_name == 'best_checkpoint':
             self.restore_best()
-        elif self.restore_from_name == 'best_checkpoint':
+        elif self.restore_from_name == 'latest_checkpoint':
             self.restore_latest()
         elif self.restore_from_name is not None:
             msg = "restore_from_name is {} but it must be either 'best_checkpoint' or 'latest_checkpoint'"
-            raise ValueError(msg .format(self.restore_fro_name))
+            raise ValueError(msg .format(self.restore_from_name))
 
     def restore_best(self):
         status = self.best_ckpt.restore(self.best_checkpoint_manager.latest_checkpoint)
