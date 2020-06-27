@@ -60,7 +60,6 @@ def load_trial(trial_path):
     if not trial_path.is_dir():
         raise ValueError("Cannot load, the path {} is not an existing directory".format(trial_path))
 
-    trial_path = trial_path.parent
     params_filename = trial_path / 'params.json'
     with params_filename.open("r") as params_file:
         params = json.load(params_file)
@@ -76,18 +75,18 @@ def create_trial(group_name, params, trials_directory=None, write_summary=True):
 
     # make subdirectory
     unique_trial_subdirectory_name = make_unique_trial_subdirectory_name()
-    full_directory = trials_directory / group_name / unique_trial_subdirectory_name
-    full_directory.mkdir(parents=True, exist_ok=False)
+    trial_path = trials_directory / group_name / unique_trial_subdirectory_name
+    trial_path.mkdir(parents=True, exist_ok=False)
 
     # save params
-    params_filename = full_directory / 'params.json'
+    params_filename = trial_path / 'params.json'
     with params_filename.open("w") as params_file:
         json.dump(params, params_file, indent=2)
 
     # write summary
     if write_summary and group_name is not None:
-        _write_summary(full_directory, group_name, unique_trial_subdirectory_name)
-    return full_directory, params
+        _write_summary(trial_path, group_name, unique_trial_subdirectory_name)
+    return trial_path, params
 
 
 def rm_tree(path):
