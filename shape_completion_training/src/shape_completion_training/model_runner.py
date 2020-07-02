@@ -235,7 +235,6 @@ class ModelRunner:
         val_metrics = sequence_of_dicts_to_dict_of_sequences(val_metrics)
         # TODO: we could get rid of this reduce mean if we used keras metrics properly
         mean_val_metrics = reduce_mean_dict(val_metrics)
-        self.write_val_summary(mean_val_metrics)
         return mean_val_metrics
 
     def train(self, train_dataset, val_dataset, num_epochs):
@@ -246,8 +245,9 @@ class ModelRunner:
         try:
             # Validation before anything
             if self.validate_first:
-                valdation_metrics = self.val_epoch(val_dataset)
-                key_metric_value = valdation_metrics[self.key_metric.key()]
+                validation_metrics = self.val_epoch(val_dataset)
+                self.write_val_summary(validation_metrics)
+                key_metric_value = validation_metrics[self.key_metric.key()]
                 print(Style.BRIGHT + "Val: {}={}".format(self.key_metric.key(), key_metric_value) + Style.NORMAL)
 
             while self.latest_ckpt.epoch < last_epoch:
@@ -262,8 +262,9 @@ class ModelRunner:
                 print(Fore.CYAN + "Saving " + save_path + Fore.RESET)
 
                 # Validation at end of epoch
-                valdation_metrics = self.val_epoch(val_dataset)
-                key_metric_value = valdation_metrics[self.key_metric.key()]
+                validation_metrics = self.val_epoch(val_dataset)
+                self.write_val_summary(validation_metrics)
+                key_metric_value = validation_metrics[self.key_metric.key()]
                 print(Style.BRIGHT + "Val: {}={}".format(self.key_metric.key(), key_metric_value) + Style.NORMAL)
                 if self.key_metric.is_better_than(key_metric_value, self.best_ckpt.best_key_metric_value):
                     self.best_ckpt.best_key_metric_value.assign(key_metric_value)

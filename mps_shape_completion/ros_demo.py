@@ -17,14 +17,14 @@ base_path = ''
 def callback(msg):
     global base_path
     arr = np.reshape(msg.data, tuple(d.size for d in msg.layout.dim))
-    print rospy.get_name(), "I heard %s"%str(arr)
+    print(rospy.get_name(), "I heard %s" % str(arr))
     occ = arr > 0.5
     # Save to file for demo
-    vox = binvox_rw.Voxels(occ, occ.shape, [0,0,0], 1, 'xyz')
-    with open(base_path + '/demo/output.binvox','wb') as f:
+    vox = binvox_rw.Voxels(occ, occ.shape, [0, 0, 0], 1, 'xyz')
+    with open(base_path + '/demo/output.binvox', 'wb') as f:
         vox.write(f)
         print('Output saved to demo/output.binvox.')
-    
+
     rospy.signal_shutdown("Got result.")
 
 
@@ -41,8 +41,6 @@ def demo():
         occ = binvox_rw.read_as_3d_array(f).data
     with open(base_path + '/demo/non_occupy.binvox', 'rb') as f:
         non = binvox_rw.read_as_3d_array(f).data
-    
-
 
     rospy.init_node('shape_demo_loader')
 
