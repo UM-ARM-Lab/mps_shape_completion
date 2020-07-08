@@ -42,7 +42,7 @@ class ModelRunner:
                  trial_path,
                  params,
                  key_metric=LossMetric,
-                 val_every_n_batches=1000,
+                 val_every_n_batches=None,
                  mid_epoch_val_batches=None,
                  save_every_hour=True,
                  validate_first=False,
@@ -162,6 +162,7 @@ class ModelRunner:
         with progressbar.ProgressBar(widgets=widgets, max_value=self.num_train_batches) as bar:
             self.num_train_batches = 0
             t0 = time.time()
+
             for batch_idx, train_batch in enumerate(train_dataset):
                 train_batch.update(self.batch_metadata)
                 self.num_train_batches += 1
@@ -233,7 +234,7 @@ class ModelRunner:
                 bar.update(self.num_val_batches)
 
         val_metrics = sequence_of_dicts_to_dict_of_sequences(val_metrics)
-        # TODO: we could get rid of this reduce mean if we used keras metrics properly
+        # TODO: we could get rid of this reduce mean if we used keras metrics properly... not all metrics should be averaged.
         mean_val_metrics = reduce_mean_dict(val_metrics)
         return mean_val_metrics
 

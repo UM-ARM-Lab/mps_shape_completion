@@ -48,6 +48,8 @@ class AccuracyMetric(Metric):
         return 0
 
 # TODO make tests for these
+
+
 def fp(y_true, y_pred, threshold=0.5):
     return tf.cast(tf.math.count_nonzero((1 - y_true) * tf.cast(y_pred > threshold, tf.float32)), tf.float32)
 
@@ -61,7 +63,7 @@ def fn(y_true, y_pred, threshold=0.5):
 
 
 def tp(y_true, y_pred, threshold=0.5):
-    return tf.cast(tf.math.count_nonzero(y_true * tf.cast(y_pred > threshold, tf.float32), ), tf.float32)
+    return tf.cast(tf.math.count_nonzero(y_true * tf.cast(y_pred > threshold, tf.float32)), tf.float32)
 
 
 def accuray_on_negatives(y_true, y_pred, threshold=0.5):

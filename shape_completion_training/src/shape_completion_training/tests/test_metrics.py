@@ -8,7 +8,6 @@ from setup_data_for_unit_tests import load_test_files
 from shape_completion_training.voxelgrid import fit
 
 
-
 class TestMetrics(unittest.TestCase):
     def test_iou_on_simple_data(self):
         vg1 = tf.random.uniform(shape=(10, 10, 10), minval=0.0, maxval=1.0)
@@ -69,12 +68,12 @@ class TestMetrics(unittest.TestCase):
         self.assertEqual(0, metrics.chamfer_distance_pointcloud(a, a))
 
     def test_chamfer_distance_voxelgrid_on_simple(self):
-        vg1 = tf.cast([[[0,0,0],[0,1,0], [0,1,0]],
-                       [[0,0,0],[0,0,0], [0,0,0]],
-                       [[0,0,0],[0,0,0], [0,0,0]]], tf.float32)
-        vg2 = tf.cast([[[0,0,0],[0,1,0], [0,0,0]],
-                       [[0,0,0],[0,1,0], [0,0,0]],
-                       [[0,0,0],[0,0,0], [0,0,0]]], tf.float32)
+        vg1 = tf.cast([[[0, 0, 0], [0, 1, 0], [0, 1, 0]],
+                       [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+                       [[0, 0, 0], [0, 0, 0], [0, 0, 0]]], tf.float32)
+        vg2 = tf.cast([[[0, 0, 0], [0, 1, 0], [0, 0, 0]],
+                       [[0, 0, 0], [0, 1, 0], [0, 0, 0]],
+                       [[0, 0, 0], [0, 0, 0], [0, 0, 0]]], tf.float32)
         d = (0.0 + 1)/2 + (0.0 + 1)/2
         self.assertEqual(d, metrics.chamfer_distance(vg1, vg2, scale=1.0))
         self.assertEqual(d/4, metrics.chamfer_distance(vg1, vg2, scale=1.0/4))
@@ -121,6 +120,11 @@ class TestUtils(unittest.TestCase):
         d = tf.cast([[1, 5, 9], [np.sqrt(5), np.sqrt(41), np.sqrt(101)]], tf.float32)
         self.assertTrue(tf.math.equal(d, metrics.distance_matrix(a, b)).numpy().all())
         # self.assertEqual(d, metrics.distance_matrix(a,b))
+
+
+class TestMetrics(unittest.TestCase):
+    def test_metrics():
+        self.assertEqual(fp(y_true=[0, 0, 1, 1], y_pred=[1, 0, 1, 1]), 1)
 
 
 if __name__ == '__main__':
