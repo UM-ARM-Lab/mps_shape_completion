@@ -209,6 +209,7 @@ class ModelRunner:
         val_metrics = sequence_of_dicts_to_dict_of_sequences(val_metrics)
         mean_val_metrics = reduce_mean_dict(val_metrics)
         self.write_val_summary(mean_val_metrics)
+        self.latest_checkpoint_manager.save()
         return mean_val_metrics
 
     def val_epoch(self, val_dataset):

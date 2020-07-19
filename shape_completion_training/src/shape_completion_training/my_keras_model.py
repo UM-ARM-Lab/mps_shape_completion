@@ -69,15 +69,15 @@ class MyKerasModel(tf.keras.Model):
 
     @tf.function
     def val_step(self, val_element):
-        train_outputs = self.call(val_element, training=False)
-        train_losses = self.compute_loss(val_element, train_outputs)
-        other_metrics = self.calculate_metrics(val_element, train_outputs)
+        val_outputs = self.call(val_element, training=False)
+        val_losses = self.compute_loss(val_element, val_outputs)
+        other_metrics = self.calculate_metrics(val_element, val_outputs)
 
         metrics = {}
-        metrics.update(train_losses)
+        metrics.update(val_losses)
         metrics.update(other_metrics)
 
-        return train_outputs, metrics
+        return val_outputs, metrics
 
     def calculate_metrics(self, dataset_element, outputs):
         return {}
