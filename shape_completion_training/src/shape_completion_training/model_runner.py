@@ -44,7 +44,7 @@ class ModelRunner:
                  key_metric=LossMetric,
                  val_every_n_batches=None,
                  mid_epoch_val_batches=None,
-                 save_every_hour=True,
+                 save_every_n_minutes: int = 60,
                  validate_first=False,
                  batch_metadata=None,
                  restore_from_name: Optional[str] = None,
@@ -58,9 +58,9 @@ class ModelRunner:
         self.params = params
         self.val_every_n_batches = val_every_n_batches
         self.mid_epoch_val_batches = mid_epoch_val_batches
-        self.save_every_hour = save_every_hour
+        self.save_every_n_minutes = save_every_n_minutes
         self.overall_job_start_time = time.time()
-        self.latest_hour = 0
+        self.latest_minute = 0
         self.validate_first = validate_first
         if batch_metadata is None:
             self.batch_metadata = {}
@@ -90,7 +90,8 @@ class ModelRunner:
                                              model=self.model)
         self.latest_checkpoint_path = self.trial_path / "latest_checkpoint"
         self.best_checkpoint_path = self.trial_path / "best_checkpoint"
-        self.latest_checkpoint_manager = tf.train.CheckpointManager(self.latest_ckpt, self.latest_checkpoint_path.as_posix(),
+        self.latest_checkpoint_manager = tf.train.CheckpointManager(self.latest_ckpt,
+                                                                    self.latest_checkpoint_path.as_posix(),
                                                                     max_to_keep=1)
         self.best_checkpoint_manager = tf.train.CheckpointManager(self.best_ckpt, self.best_checkpoint_path.as_posix(),
                                                                   max_to_keep=1)
@@ -101,7 +102,7 @@ class ModelRunner:
             self.restore_latest()
         elif self.restore_from_name is not None:
             msg = "restore_from_name is {} but it must be either 'best_checkpoint' or 'latest_checkpoint'"
-            raise ValueError(msg .format(self.restore_from_name))
+            raise ValueError(msg.format(self.restore_from_name))
 
     def restore_best(self):
         status = self.best_ckpt.restore(self.best_checkpoint_manager.latest_checkpoint)
@@ -181,14 +182,18 @@ class ModelRunner:
                 self.latest_ckpt.train_time.assign_add(train_time)
 
                 # Mid-epoch validation
-                if self.val_every_n_batches is not None and self.latest_ckpt.epoch <= 1 and batch_idx % self.val_every_n_batches == 0 and batch_idx > 0:
+                if self.val_every_n_batches is not None \
+                        and batch_idx % self.val_every_n_batches == 0 \
+                        and batch_idx > 0:
                     self.mid_epoch_validation(val_dataset)
 
                 # Mid-epoch checkpointing
                 overall_job_dt = now - self.overall_job_start_time
-                current_hour = int(overall_job_dt // (60 * 60))
-                if self.save_every_hour and current_hour > self.latest_hour:
-                    self.latest_hour = current_hour
+                current_minute = int(overall_job_dt // 60)
+                if self.save_every_n_minutes \
+                        and current_minute > self.latest_minute \
+                        and current_minute % self.save_every_n_minutes == 0:
+                    self.latest_minute = current_minute
                     save_path = self.latest_checkpoint_manager.save()
                     print("Saving " + save_path)
 

@@ -48,11 +48,6 @@ def create_or_load_trial(group_name=None, trial_path=None, params=None, trials_d
 
 
 def load_trial(trial_path):
-    """
-    @param trial_path: full path or relative path from shape_completion_training/trials
-    @type trial_path: str
-    @return:
-    """
     trial_path = pathlib.Path(trial_path)
     if not trial_path.is_absolute():
         r = rospkg.RosPack()
