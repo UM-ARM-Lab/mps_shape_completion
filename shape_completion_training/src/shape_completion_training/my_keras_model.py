@@ -5,6 +5,9 @@ import tensorflow as tf
 
 class MyKerasModel(tf.keras.Model):
 
+    def get_config(self):
+        super(self).get_config()
+
     def __init__(self, hparams, batch_size, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.batch_size = batch_size
@@ -51,8 +54,12 @@ class MyKerasModel(tf.keras.Model):
         # By default, the losses are assumed to be a dictionary, and all losses will be treated as metrics
         return {}
 
+    def preprocess_no_gradient(self, element):
+        return element
+
     @tf.function
     def train_step(self, train_element):
+        train_element = self.preprocess_no_gradient(train_element)
         with tf.GradientTape() as tape:
             train_outputs = self.call(train_element, training=True)
             train_losses = self.compute_loss(train_element, train_outputs)
@@ -69,6 +76,7 @@ class MyKerasModel(tf.keras.Model):
 
     @tf.function
     def val_step(self, val_element):
+        val_element = self.preprocess_no_gradient(val_element)
         val_outputs = self.call(val_element, training=False)
         val_losses = self.compute_loss(val_element, val_outputs)
         other_metrics = self.calculate_metrics(val_element, val_outputs)
