@@ -2,6 +2,7 @@ import json
 import pathlib
 import unittest
 
+import arc_utilities.path_utils
 from shape_completion_training.model import filepath_tools
 
 
@@ -18,7 +19,7 @@ class FilePathToolsTest(unittest.TestCase):
         trial_directory = trial_directory
         self.assertTrue(trial_directory.exists())
         self.assertEqual(trial_directory.parent, pathlib.Path(base_dir) / group_name)
-        filepath_tools.rm_tree(trial_directory)
+        arc_utilities.path_utils.rm_tree(trial_directory)
 
     def test_get_trial_directory_load_nonexistant(self):
         trial_path = pathlib.Path('.testing/new_trial/subdir_non_existing')

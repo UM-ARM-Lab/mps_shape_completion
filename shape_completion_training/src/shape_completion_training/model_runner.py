@@ -1,10 +1,12 @@
 import datetime
+import pathlib
 import time
 from typing import Optional
 
 import progressbar
 import tensorflow as tf
 from colorama import Fore, Style
+
 from shape_completion_training.metric import LossMetric
 from shape_completion_training.model.ae_vcnn import AE_VCNN
 from shape_completion_training.model.augmented_ae import Augmented_VAE
@@ -41,20 +43,19 @@ class ModelRunner:
                  training,
                  trial_path,
                  params,
+                 checkpoint: Optional[pathlib.Path] = None,
                  key_metric=LossMetric,
                  val_every_n_batches=None,
                  mid_epoch_val_batches=None,
                  save_every_n_minutes: int = 60,
                  validate_first=False,
                  batch_metadata=None,
-                 restore_from_name: Optional[str] = None,
                  ):
         self.model = model
-        self.side_length = 64
-        self.num_voxels = self.side_length ** 3
         self.training = training
         self.key_metric = key_metric
         self.trial_path = trial_path
+        self.checkpoint = checkpoint
         self.params = params
         self.val_every_n_batches = val_every_n_batches
         self.mid_epoch_val_batches = mid_epoch_val_batches
@@ -66,7 +67,6 @@ class ModelRunner:
             self.batch_metadata = {}
         else:
             self.batch_metadata = batch_metadata
-        self.restore_from_name = restore_from_name
 
         self.group_name = self.trial_path.parts[-2]
 
@@ -79,48 +79,43 @@ class ModelRunner:
         self.latest_ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                                                epoch=tf.Variable(0),
                                                train_time=tf.Variable(0.0),
-                                               best_key_metric_value=tf.Variable(
-                                                   self.key_metric.worst(), dtype=tf.float32),
+                                               best_key_metric_value=tf.Variable(self.key_metric.worst(), dtype=tf.float32),
                                                model=self.model)
         self.best_ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                                              epoch=tf.Variable(0),
                                              train_time=tf.Variable(0.0),
-                                             best_key_metric_value=tf.Variable(
-                                                 self.key_metric.worst(), dtype=tf.float32),
+                                             best_key_metric_value=tf.Variable(self.key_metric.worst(), dtype=tf.float32),
                                              model=self.model)
+
         self.latest_checkpoint_path = self.trial_path / "latest_checkpoint"
         self.best_checkpoint_path = self.trial_path / "best_checkpoint"
         self.latest_checkpoint_manager = tf.train.CheckpointManager(self.latest_ckpt,
                                                                     self.latest_checkpoint_path.as_posix(),
                                                                     max_to_keep=1)
-        self.best_checkpoint_manager = tf.train.CheckpointManager(self.best_ckpt, self.best_checkpoint_path.as_posix(),
+        self.best_checkpoint_manager = tf.train.CheckpointManager(self.best_ckpt,
+                                                                  self.best_checkpoint_path.as_posix(),
                                                                   max_to_keep=1)
 
-        if self.restore_from_name == 'best_checkpoint':
-            self.restore_best()
-        elif self.restore_from_name == 'latest_checkpoint':
-            self.restore_latest()
-        elif self.restore_from_name is not None:
-            msg = "restore_from_name is {} but it must be either 'best_checkpoint' or 'latest_checkpoint'"
-            raise ValueError(msg.format(self.restore_from_name))
+        if self.checkpoint is not None:
+            self.restore()
 
-    def restore_best(self):
-        status = self.best_ckpt.restore(self.best_checkpoint_manager.latest_checkpoint)
-        if self.best_checkpoint_manager.latest_checkpoint is not None:
-            print(Fore.CYAN + "Restoring best {}".format(
-                self.best_checkpoint_manager.latest_checkpoint) + Fore.RESET)
-            self.latest_ckpt = self.best_ckpt
-        else:
-            raise ValueError("Failed to restore! wrong checkpoint path?")
-
-    def restore_latest(self):
-        status = self.latest_ckpt.restore(self.latest_checkpoint_manager.latest_checkpoint)
-        self.best_ckpt.best_key_metric_value = self.latest_ckpt.best_key_metric_value
-        if self.latest_checkpoint_manager.latest_checkpoint is not None:
-            print(Fore.CYAN + "Restoring latest {}".format(
-                self.latest_checkpoint_manager.latest_checkpoint) + Fore.RESET)
-        else:
-            raise ValueError("Failed to restore! wrong checkpoint path?")
+    def restore(self):
+        restore_latest_checkpoint_path = self.checkpoint.parent / "latest_checkpoint"
+        restore_best_checkpoint_path = self.checkpoint.parent / "best_checkpoint"
+        restore_latest_checkpoint_manager = tf.train.CheckpointManager(self.latest_ckpt,
+                                                                       restore_latest_checkpoint_path.as_posix(),
+                                                                       max_to_keep=1)
+        restore_best_checkpoint_manager = tf.train.CheckpointManager(self.best_ckpt,
+                                                                     restore_best_checkpoint_path.as_posix(),
+                                                                     max_to_keep=1)
+        self.best_ckpt.restore(restore_best_checkpoint_manager.latest_checkpoint)
+        if self.checkpoint.name == 'latest_checkpoint':
+            status = self.latest_ckpt.restore(restore_latest_checkpoint_manager.latest_checkpoint)
+            if restore_latest_checkpoint_manager.latest_checkpoint is not None:
+                print(Fore.CYAN + "Restoring latest {}".format(restore_latest_checkpoint_manager.latest_checkpoint))
+                status.assert_existing_objects_matched()
+            else:
+                raise ValueError("Failed to restore! wrong checkpoint path?")
 
     def count_params(self):
         self.model.summary()
@@ -135,16 +130,28 @@ class ModelRunner:
         model_image_path = self.trial_path / 'network.png'
         tf.keras.utils.plot_model(self.model, model_image_path.as_posix(), show_shapes=True)
 
-    def write_train_summary(self, summary_dict):
-        with self.train_summary_writer.as_default():
+    def write_individual_summary(self, k, v):
+        if v.ndim == 0:
+            tf.summary.scalar(k, v, step=self.latest_ckpt.step.numpy())
+        elif v.ndim == 4:
+            tf.summary.image(k, v, step=self.latest_ckpt.step.numpy())
+        else:
+            raise NotImplementedError(f"invalid number of dimensions in summary {v.ndim}")
+        # TODO: gif summary?
+        # if v.ndim == 5:
+        #     tf.summary.video_scalar(k, v, step = self.latest_ckpt.step.numpy())
+
+    def write_summary(self, writer, summary_dict):
+        with writer.as_default():
             for k in summary_dict:
-                tf.summary.scalar(k, summary_dict[k].numpy(
-                ), step=self.latest_ckpt.step.numpy())
+                v = summary_dict[k].numpy()
+                self.write_individual_summary(k, v)
+
+    def write_train_summary(self, summary_dict):
+        self.write_summary(self.train_summary_writer, summary_dict)
 
     def write_val_summary(self, summary_dict):
-        with self.val_summary_writer.as_default():
-            for k in summary_dict:
-                tf.summary.scalar(k, summary_dict[k].numpy(), step=self.latest_ckpt.step.numpy())
+        self.write_summary(self.val_summary_writer, summary_dict)
 
     def train_epoch(self, train_dataset, val_dataset):
         if self.num_train_batches is not None:
@@ -198,13 +205,6 @@ class ModelRunner:
                     print("Saving " + save_path)
 
     def mid_epoch_validation(self, val_dataset):
-        max_size = self.mid_epoch_val_batches
-        widgets = [
-            ' VAL   ', progressbar.Counter(), '/', max_size,
-            progressbar.Bar(),
-            ' (', progressbar.ETA(), ') ',
-        ]
-
         val_metrics = []
         for i, val_batch in enumerate(val_dataset.take(self.mid_epoch_val_batches)):
             val_batch.update(self.batch_metadata)

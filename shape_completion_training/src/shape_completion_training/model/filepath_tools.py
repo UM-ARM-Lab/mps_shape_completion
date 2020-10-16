@@ -4,6 +4,7 @@ import json
 import pathlib
 import subprocess
 from datetime import datetime
+from typing import Optional, Dict
 
 import git
 import rospkg
@@ -18,21 +19,11 @@ def make_unique_trial_subdirectory_name(*names):
     return format_string.format(stamp, sha, *names)
 
 
-def create_or_load_trial(group_name=None, trial_path=None, params=None, trials_directory=None, write_summary=True):
-    """
-    @param group_name:
-    @type group_name: str
-    @param trial_path:
-    @type trial_path: str
-    @param params:
-    @type params: dict
-    @param trials_directory:
-    @type trials_directory: str
-    @param write_summary: Only applies when creating a new trial
-    @type write_summary: bool
-    @return: trial_path, trial_hyper_parameters
-    @rtype: (pathlib.Path, dict)
-    """
+def create_or_load_trial(group_name: Optional[pathlib.Path] = None,
+                         trial_path: Optional[pathlib.Path] = None,
+                         params: Optional[Dict] = None,
+                         trials_directory: Optional[pathlib.Path] = None,
+                         write_summary: Optional[bool] = True):
     if trial_path is not None:
         # Resume and warn for errors
         if group_name is not None:
@@ -82,16 +73,6 @@ def create_trial(group_name, params, trials_directory=None, write_summary=True):
     if write_summary and group_name is not None:
         _write_summary(trial_path, group_name, unique_trial_subdirectory_name)
     return trial_path, params
-
-
-def rm_tree(path):
-    path = pathlib.Path(path)
-    for child in path.glob('*'):
-        if child.is_file():
-            child.unlink()
-        else:
-            rm_tree(child)
-    path.rmdir()
 
 
 def _write_summary(full_trial_directory, group_name, unique_trial_subdirectory_name):

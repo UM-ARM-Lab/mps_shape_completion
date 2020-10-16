@@ -74,7 +74,7 @@ def set_gpu_with_lowest_memory():
 def reduce_mean_dict(dict):
     reduced_dict = {}
     for k, v in dict.items():
-        reduced_dict[k] = tf.reduce_mean(v)
+        reduced_dict[k] = tf.reduce_mean(tf.stack(v, axis=0), axis=0)
     return reduced_dict
 
 
