@@ -33,9 +33,9 @@ def create_or_load_trial(group_name: Optional[pathlib.Path] = None,
             print(Fore.YELLOW + "Ignoring params, loading existing ones" + Fore.RESET)
         return load_trial(trial_path)
     elif group_name is not None:
-        return create_trial(group_name, params, trials_directory, write_summary)
+        return create_trial(group_name, params, trials_directory)
     else:
-        return create_trial('tmp', params, trials_directory, write_summary)
+        return create_trial('tmp', params, trials_directory)
 
 
 def load_trial(trial_path):
@@ -52,7 +52,7 @@ def load_trial(trial_path):
     return trial_path, params
 
 
-def create_trial(group_name, params, trials_directory=None, write_summary=True):
+def get_trial_path(group_name, trials_directory=None):
     if trials_directory is None:
         r = rospkg.RosPack()
         shape_completion_training_path = pathlib.Path(r.get_path('shape_completion_training'))
@@ -62,6 +62,12 @@ def create_trial(group_name, params, trials_directory=None, write_summary=True):
     # make subdirectory
     unique_trial_subdirectory_name = make_unique_trial_subdirectory_name()
     trial_path = trials_directory / group_name / unique_trial_subdirectory_name
+
+    return trial_path
+
+
+def create_trial(group_name, params, trials_directory=None):
+    trial_path = get_trial_path(group_name, trials_directory=trials_directory)
     trial_path.mkdir(parents=True, exist_ok=False)
 
     # save params
@@ -69,9 +75,6 @@ def create_trial(group_name, params, trials_directory=None, write_summary=True):
     with params_filename.open("w") as params_file:
         json.dump(params, params_file, indent=2)
 
-    # write summary
-    if write_summary and group_name is not None:
-        _write_summary(trial_path, group_name, unique_trial_subdirectory_name)
     return trial_path, params
 
 

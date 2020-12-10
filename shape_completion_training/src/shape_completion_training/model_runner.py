@@ -245,9 +245,6 @@ class ModelRunner:
         return mean_val_metrics
 
     def train(self, train_dataset, val_dataset, num_epochs):
-        # self.build_model(train_dataset)
-        # self.count_params()
-
         last_epoch = self.latest_ckpt.epoch + num_epochs
         try:
             # Validation before anything
@@ -281,3 +278,5 @@ class ModelRunner:
 
         except KeyboardInterrupt:
             print(Fore.YELLOW + "Interrupted." + Fore.RESET)
+
+        return validation_metrics
