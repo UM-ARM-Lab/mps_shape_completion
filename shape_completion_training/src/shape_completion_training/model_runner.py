@@ -7,7 +7,7 @@ import progressbar
 import tensorflow as tf
 from colorama import Fore, Style
 
-from shape_completion_training.metric import LossMetric
+from moonshine.metric import LossMetric
 from shape_completion_training.model.ae_vcnn import AE_VCNN
 from shape_completion_training.model.augmented_ae import Augmented_VAE
 from shape_completion_training.model.auto_encoder import AutoEncoder

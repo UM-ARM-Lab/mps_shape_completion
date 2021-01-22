@@ -2,8 +2,7 @@
 
 import unittest
 import tensorflow as tf
-import numpy as np
-from shape_completion_training import metric
+from moonshine import metric
 
 
 class TestMetrics(unittest.TestCase):
